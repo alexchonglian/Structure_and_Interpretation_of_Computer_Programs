@@ -23,6 +23,8 @@
 ;(numer <x>)
 ;(denom <x>)
 
+
+
 (define (add-rat x y)
   (make-rat (+ (* (numer x)(denom y))
                (* (numer y)(denom x)))
@@ -232,10 +234,14 @@ data
       (div-iter (/ n m) m (+ 1 result))
       result))
 
-;(div-iter 72 2 0)
-;3
-;(div-iter 72 3 0)
-;2
+(define (div-recur n base)
+  (if (= 0 (remainder n base))
+      (+ 1 (div-recur (/ n base) base))
+      0))
+;(div-recur 72 2);3
+;(div-recur 72 3);2
+;(div-iter 72 2 0);3
+;(div-iter 72 3 0);2
 
 (define (car! z)(div-iter z 2 0))
 (define (cdr! z)(div-iter z 3 0))
@@ -588,7 +594,9 @@ B;=[1 2]
 
 (define squares (list 1 4 9 16 25))
 
-;(list-ref! squares 3)
+;(list-ref squares 3)
+;(list-ref '(1 4 9) 3);violation, 0 indexed
+;(list-ref '(1 4 9 16) 3);
 ;16
 
 ;; length is builtin in DrRacket R5RS
@@ -690,26 +698,42 @@ B;=[1 2]
 ;; experiment with dotted-tail notation
 (define (f x y . z) z)
 ;(f 1)
-(f 1 2)
-;()
-(f 1 2 3)
-;(3)
-(f 1 2 3 4)
-;(3 4)
+(f 1 2);()
+(f 1 2 3);(3)
+(f 1 2 3 4);(3 4)
+(f 1 2 3 4 5);(3 4 5)
+(newline)
 
 (define (g . x) x)
-(g)
-;()
-(g 1 2 3)
-;(1 2 3)
+(g);()
+(g 1 2 3);(1 2 3)
+(newline)
 
 (define h (lambda x x))
-(h)
-(h 1)
-(h 1 2)
-(h 1 2 3)
+(h);()
+(h 1);(1)
+(h 1 2);(1 2)
+(h 1 2 3);(1 2 3)
+(newline)
+
 (define i (lambda (x) x))
-;(i)
+(i '())
+(i '(1))
+(i '(1 2))
+(i '(1 2 3))
+(newline)
+
+;; what is the difference between (lambda x x) and (lambda (x) x)
+(define j1 (lambda x x))
+(define j2 (lambda (x) x))
+(define j3 (lambda (x y) (cons x (cons y '()))))
+(define j4 (lambda (x . y) (cons x y)))
+
+(j1 1 2 3);(1 2 3)
+(j1 '(1) '(2 3));((1) (2 3))
+;(j2 '(1) '(2 3));arity mismatch
+(j3 '(1) '(2 3));((1) (2 3)) ;; can only accept fixed number of params
+(j4 1 2 3);(1 2 3) can accept variable number of vars but not null
 
 (define (same-parity head . rest)
   (define (recur filter l)
@@ -745,10 +769,14 @@ B;=[1 2]
 ;(1 4 9 16)
 
 ;builtin map is more powerful
-;(map + '(1 4 7) '(20 50 80) '(300 600 900))
+#|
+(map + '(1 4 7) '(20 50 80) '(300 600 900))
 ;(321 654 987)
-;(map (lambda (x y)(+ x y y)) '(1 2 3) '(100 200 300))
+(map (lambda (x y)(+ x y y)) '(1 2 3) '(100 200 300))
 ;(201 402 603)
+(map (lambda x x) '(1 4 7) '(20 50 80) '(300 600 900))
+;((1 20 300) (4 50 600) (7 80 900))
+|#
 
 (define (scale-list items factor)
   (map (lambda (x)(* factor x)) items))
@@ -776,7 +804,8 @@ B;=[1 2]
   (define (iter things answer)
     (if (null? things)
         answer
-        (iter (cdr things)(cons (square (car things)) answer))))
+        (iter (cdr things)
+              (cons (square (car things)) answer))))
   (iter items '()))
 (square-list '(1 2 3 4))
 ;(16 9 4 1)
@@ -786,15 +815,29 @@ B;=[1 2]
   (define (iter things answer)
     (if (null? things)
         answer
-        (iter (cdr things)(cons answer (square (car things))))))
+        (iter (cdr things)
+              (cons answer (square (car things))))))
   (iter items '()))
 (square-list '(1 2 3 4))
-;(16 9 4 1)
+;((((() . 1) . 4) . 9) . 16)
 ;doesn't work bcz it cons list into atom
+
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things);use append instead of cons
+              (append answer (cons (square (car things)) '())))))
+  (iter items '()))
+(square-list '(1 2 3 4))
+;(1 4 9 16)
+;now it works
 |#
 
 
 '(exercise 2 23)#|
+(for-each (lambda (x)(newline)(display x)) '(1 2 3 4))
+
 (define (for-each! proc items)
   (proc (car items))
   (if (null? (cdr items))
@@ -803,8 +846,6 @@ B;=[1 2]
 
 (for-each! (lambda (x)(newline)(display x)) '(1 2 3 4))
 |#
-
-
 
 
 ;(cons '(1 2) '(3 4))
@@ -885,17 +926,27 @@ B;=[1 2]
   (cond
     ((null? x) '())
     ((pair? (car x)) (append (deep-reverse (cdr x))
-                             (cons (deep-reverse (car x)) '())))
+                             ;(cons (deep-reverse (car x)) '())))
+                             (list (deep-reverse (car x)))))
     (else (append (deep-reverse (cdr x))
                   (cons (car x) '())))))
+(deep-reverse x);((4 3) (2 1))
 
 ;; much more clever one! 
 (define (deep-reverse x)
   (if (pair? x)
       (append (deep-reverse (cdr x))(list (deep-reverse (car x))))
       x))
+(deep-reverse x);((4 3) (2 1))
 
-;; do it without using append
+;; another clever one that uses reverse and map
+(define (deep-reverse x)
+  (if (pair? x)
+      (reverse (map deep-reverse x))
+      x))
+(deep-reverse x);((4 3) (2 1))
+
+;; do it without using append, not my work
 (define (deep-reverse items)
   (define (iter items result)
     (if (null? items)
@@ -905,10 +956,31 @@ B;=[1 2]
               (iter (cdr items) (cons x result)))
             (iter (cdr items) (cons (car items) result))))) 
   (iter items '()))
+(deep-reverse x);((4 3) (2 1))
 
-x
-(reverse x)
-(deep-reverse x)
+;; simplify the above
+;; iterative
+(define (deep-reverse items)
+  (define (iter items result)
+    (cond ((null? items) result)
+          ((pair? (car items))(iter (cdr items)
+                                    (cons (iter (car items) '()) result)))
+          (else (iter (cdr items) (cons (car items) result)))))
+  (iter items '()))
+(deep-reverse x);((4 3) (2 1))
+
+;; refactor further 
+(define (deep-reverse items)
+  (define (iter L R)
+    (cond ((null? L) R)
+          ((not (pair? (car L))) (iter (cdr L) (cons (car L) R)))
+          (else (iter (cdr L) (cons (iter (car L) '()) R)))))
+  (iter items '()))
+(deep-reverse x);((4 3) (2 1))
+
+(newline)
+(reverse x);((3 4) (1 2))
+(deep-reverse x);((4 3) (2 1))
 (deep-reverse '(1 (2 3 (4 5) 6) 7 (8 (9 0))))
 
 ;(1 (2 3 (4 5) 6) 7 (8 (9 0)))
@@ -930,8 +1002,48 @@ x
     ((pair? (car x)) (append (fringe (car x))(fringe (cdr x))))
     (else (cons (car x)(fringe (cdr x))))))
 
-(fringe x)
-(fringe (list x x))
+(fringe x);(1 2 3 4)
+(fringe (list x x));(1 2 3 4 1 2 3 4)
+(fringe '(() 1 2));(() 1 2) ;;found an insidious bug
+
+;recursive ;debug the above
+(define (fringe x)
+  (cond
+    ((null? x) '())
+    ((pair? (car x)) (append (fringe (car x))(fringe (cdr x))))
+    ((null? (car x)) (fringe (cdr x)))
+    (else (cons (car x)(fringe (cdr x))))))
+(newline)
+(fringe x);(1 2 3 4)
+(fringe (list x x));(1 2 3 4 1 2 3 4)
+(fringe '(() 1 2)); (1 2)
+
+;recursive in a cleaner way
+(define (fringe x)
+  (cond
+    ((null? x) '())
+    ((not (pair? x)) (list x))
+    (else (append (fringe (car x)) (fringe (cdr x))))))
+(newline)
+(fringe x);(1 2 3 4)
+(fringe (list x x));(1 2 3 4 1 2 3 4)
+(fringe '(() 1 2)); (1 2)
+
+;recursive with helper function append-items-in-list
+(define (append-items-in-list x)
+  (cond ((null? x) '())
+        (else (append (car x)(append-items-in-list (cdr x))))))
+(append-items-in-list '((9 8) (7 6 5) () (4 3 2 1)));(9 8 7 6 5 4 3 2 1)
+
+(define (fringe x)
+  (cond
+    ((null? x) '())
+    ((not (pair? x))  (list x))
+    (else (append-items-in-list (map fringe x)))))
+(newline)
+(fringe x);(1 2 3 4)
+(fringe (list x x));(1 2 3 4 1 2 3 4)
+(fringe '(() 1 2)); (1 2)
 
 ;iterative
 (define (fringe tree) 
@@ -940,11 +1052,11 @@ x
           ((not (pair? x)) (cons x result)) 
           (else (build (car x)  
                        (build (cdr x) result))))) 
-  
   (build tree '())) 
-
-(fringe x)
-(fringe (list x x))
+(newline)
+(fringe x);(1 2 3 4)
+(fringe (list x x));(1 2 3 4 1 2 3 4)
+(fringe '(() 1 2));(1 2)
 |#
 
 '(exercise 2 29)#|
@@ -953,7 +1065,10 @@ x
   (list left right))
 
 (define (make-branch length structure)
-  (list length structure));structure <= {mobile, weight}
+  (list length structure))
+;structure <= {mobile, weight}
+;; think of mobile as hook
+;; think of branch as horizontal bar
 
 ;selector
 (define L-branch car)
@@ -984,6 +1099,7 @@ x
 ;                           20               20
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define m1 
   (M 
    (B 4 60) (B 6 
@@ -1003,11 +1119,12 @@ m2; is unbalanced
 
 (define (total-weight mobile)
   (define (branch-weight branch)
-    (if (number? (br-struct branch))
+    (if (number? (br-struct branch));br-struct can be weight or mobile
         (br-struct branch);if not number, then must be mobile
         (total-weight (br-struct branch))))
   (+ (branch-weight (L-branch mobile))
      (branch-weight (R-branch mobile))))
+
 
 (total-weight m1)
 ;100
@@ -2663,7 +2780,7 @@ sample-tree
 ;(a d a b b c a)
 
 
-'(exercise 2 68)
+'(exercise 2 68)#|
 (define (encode message tree)
   (if (null? message)
       '()
@@ -2681,7 +2798,7 @@ sample-tree
            (else (display "not found"))))
    (iter tree '()))
 (encode '(a d a b b c a) sample-tree)
-
+|#
 
 
 
