@@ -1360,7 +1360,7 @@ x
 (cont-frac (lambda (i) 1.0)
            (lambda (i) 1.0)
            12)
-;same output for both procedure
+;same output for both procedures
 ;0.6179775280898876
 ;0.6180555555555556
 ;0.6180257510729613
@@ -1510,7 +1510,7 @@ x
 ((cubic 1 1 1) 2);15
 
 (define (find-zero-cubic x)
-  (newton-method (cubic 1 1 -3) 1));solve x for (x^3)+(x^2)+x-3 = 1
+  (newton-method (cubic 1 1 -3) 1));solve x for (x^3)+(x^2)+x-3 = 0
 
 (find-zero-cubic 0.0)
 ;1
