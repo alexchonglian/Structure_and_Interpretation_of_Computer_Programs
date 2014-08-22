@@ -1203,9 +1203,12 @@ m2; is unbalanced
 
 ;(scale-tree '(1 (2 (3 4) 5) (6 7)) 10)
 ;(10 (20 (30 40) 50) (60 70))
+;(scale-tree '(1 2 3 ()));arity mismatch
+;extra parenthesis will break it but we ignore it for now
 
 
 '(exercise 2 30)#|
+(define (square x)(expt x 2))
 ;directly
 ;without using higher-order procedure
 (define (square-tree tree)
@@ -1215,9 +1218,19 @@ m2; is unbalanced
                               (square-tree (cdr tree))))
     (else (cons (square (car tree))
                 (square-tree (cdr tree))))))
+(square-tree '(1 (2 (3 4) 5) (6 7)));(1 (4 (9 16) 25) (36 49))
+;(square-tree '(1 (2 (3 4) 5) (6 7) ()))
 
-(square-tree '(1 (2 (3 4) 5) (6 7)))
-;(1 (4 (9 16) 25) (36 49))
+;follow style of scale-tree
+(define (square-tree tree)
+  (cond
+    ((null? tree) '())
+    ((not (pair? tree)) (square tree))
+    (else (cons (square-tree (car tree))
+                (square-tree (cdr tree))))))
+(square-tree '(1 (2 (3 4) 5) (6 7)));(1 (4 (9 16) 25) (36 49))
+(square-tree '(1 (2 (3 4) 5) (6 7) ())); breaks
+
 
 ;using map and recursion
 (define (square-tree tree)
@@ -1226,10 +1239,10 @@ m2; is unbalanced
              (square-tree sub-tree)
              (square sub-tree)))
        tree))
-
-(square-tree '(1 (2 (3 4) 5) (6 7)))
-;(1 (4 (9 16) 25) (36 49))
+(square-tree '(1 (2 (3 4) 5) (6 7)));(1 (4 (9 16) 25) (36 49))
+;(square-tree '(1 (2 (3 4) 5) (6 7) ())); breaks
 |#
+
 
 '(exercise 2 31)#|
 ;directly
@@ -1241,13 +1254,21 @@ m2; is unbalanced
                               (tree-map f (cdr tree))))
     (else (cons (f (car tree))
                 (tree-map f (cdr tree))))))
-
-(define (square-tree tree) (tree-map square tree))
-(square-tree '(1 (2 (3 4) 5) (6 7)))
-;(1 (4 (9 16) 25) (36 49))
-
+;(square-tree '(1 (2 (3 4) 5) (6 7)));(1 (4 (9 16) 25) (36 49))
 
 ;another
+(define (tree-map f tree)
+  (cond
+    ((null? tree) '())
+    ((not (pair? tree)) (f tree))
+    (else (cons (tree-map f (car tree))
+                (tree-map f (cdr tree))))))
+
+(define (square-tree tree) (tree-map square tree))
+(square-tree '(1 (2 (3 4) 5) (6 7)));(1 (4 (9 16) 25) (36 49))
+
+
+;rewrite the above
 (define (tree-map f tree) 
   (cond ((null? tree) '()) 
         ((pair? tree)  
@@ -1257,9 +1278,7 @@ m2; is unbalanced
         (else (f tree)))) 
 
 (define (square-tree tree) (tree-map square tree))
-(square-tree '(1 (2 (3 4) 5) (6 7)))
-;(1 (4 (9 16) 25) (36 49))
-
+(square-tree '(1 (2 (3 4) 5) (6 7)));(1 (4 (9 16) 25) (36 49))
 
 ;using map nad recursion
 (define (tree-map f tree)
@@ -1273,7 +1292,6 @@ m2; is unbalanced
 (square-tree '(1 (2 (3 4) 5) (6 7)))
 ;(1 (4 (9 16) 25) (36 49))
 |#
-
 
 
 '(exercise 2 32)#|
@@ -1297,8 +1315,6 @@ m2; is unbalanced
 (S '(2 3));   [3] =>  [2] + (cons 2 [2])  =>  (nil (3) (2) (2 3))
 (S '(1 2 3)); [4] =>  [3] + (cons 1 [3])  =>  final output
 |#
-
-
 
 (define (sum-odd-squares tree)
   (cond
@@ -1344,7 +1360,6 @@ m2; is unbalanced
 
 ;(filter odd? '(1 2 3 4 5))
 ;(1 3 5)
-
 
 (define (accumulate op initial sequence)
   (if (null? sequence)
@@ -1477,15 +1492,28 @@ m2; is unbalanced
 
 '(exercise 2 35)#|
 (define t1 '(1 2 (3 4) (5 (6 7))))
+(define t2 '(1 2 (3 4) (5 (6 7 ()))))
+
 (define (count-leaves t)
   (accumulate + 0 
               (map (lambda (x) (if (pair? x)
                                    (count-leaves x) 
                                    1))
                    t)))
-(count-leaves t1)
-;7
+(newline)
+(count-leaves t1);7
+(count-leaves t2);8 because '() will count as 1
 
+;; try to fix this bug
+(define (count-leaves t)
+  (accumulate + 0
+              (map (lambda (x) (cond ((null? x) 0)
+                                     ((pair? x) (count-leaves x))
+                                     (else 1)))
+                   t)))
+(newline)
+(count-leaves t1);7
+(count-leaves t2);7 bug fixed
 
 ;; or making use of enumerate-tree
 (define (enumerate-tree tree)
@@ -1498,12 +1526,12 @@ m2; is unbalanced
   (accumulate + 0 (map (lambda (x) 1)
                        (enumerate-tree t))))
 
-
-(enumerate-tree t1)
-;(1 2 3 4 5 6 7)
-(count-leaves t1)
-;7
+(newline)
+(enumerate-tree t1);(1 2 3 4 5 6 7)
+(count-leaves t1);7
+(count-leaves t2);7 works for enumerate-tree
 |#
+
 
 '(exercise 2 36)#|
 (define (accumulate-n op init seqs)
