@@ -1547,13 +1547,12 @@ s
 |#
 
 
-'(exercise 2 37)#|
+'(exercise 2 37)#| 
 (define (accumulate op initial sequence)
   (if (null? sequence)
       initial
       (op (car sequence)
           (accumulate op initial (cdr sequence)))))
-
 
 (define (dot-product v w)
   (accumulate + 0 (map * v w)))
@@ -1566,7 +1565,6 @@ s
   (map (lambda (x) (dot-product v x)) m))
 (matrix-*-vector '((1 2 3) (4 5 6)) '(1 0 -1))
 ;(-2 -2)
-
 
 (define (accumulate-n op init seqs)
   (if (null? (car seqs))
@@ -1598,29 +1596,57 @@ s
 ;((10 20) (26 52) (42 84))
 |#
 
-'(exercise 2 38)#|
-(define (fold-left op initial sequence)
-  (define (iter result rest)
-    (if (null? rest)
-        result
-        (iter (op result (car rest))
-              (cdr rest))))
-  (iter initial sequence))
+'(exercise 2 38)#| 
+;; fold-right recur
+(define (fold-right op init seq)
+  (if (null? seq)
+      init
+      (op (car seq)
+          (fold-right op init (cdr seq)))))
+(fold-right list '() '(1 2 3));(1 (2 (3 ())))
 
-
-(define (accumulate op initial sequence)
-  (if (null? sequence)
-      initial
-      (op (car sequence)(accumulate op initial (cdr sequence)))))
-
-(define (fold-right op initial sequence)
+;; fold-right iter
+(define (fold-right op init seq)
   (define (iter result rest)
     (if (null? rest)
         result
         (op (car rest)
             (iter result (cdr rest)))))
-  (iter initial sequence))
+  (iter init seq))
+(fold-right list '() '(1 2 3));(1 (2 (3 ())))
 
+;; fold-left recur
+(define (fold-left op init seq)
+  (if (null? seq)
+      init
+      (op (fold-left op init (cdr seq))
+          (car seq))))
+(fold-left list '() '(1 2 3));(((() 3) 2) 1)
+; wrong
+
+;; fold-left recur
+(define (fold-left op init seq)
+  (let ((rev-seq (reverse seq)))
+  (if (null? seq)
+      init
+      (op (fold-left op init (reverse (cdr rev-seq)))
+          (car rev-seq)))))
+(fold-left list '() '(1 2 3));(((() 1) 2) 3)
+; works though ugly
+
+;; fold-left iter
+(define (fold-left op init seq)
+  (define (iter result rest)
+    (if (null? rest)
+        result
+        (iter (op result (car rest))
+              (cdr rest))))
+  (iter init seq))
+(fold-left list '() '(1 2 3));(((() 1) 2) 3)
+
+
+(newline)
+(display "other examples")(newline)
 (fold-right + 0 '(1 2 3 4 5));15
 (fold-right * 1 '(1 2 3 4 5));120
 (fold-right cons '() '(1 2 3 4 5));(1 2 3 4 5)
@@ -1631,10 +1657,8 @@ s
 (fold-left / 1 '(1 2 3))
 ;(/ (/ (/ 1 1) 2) 3)
 
-(fold-right list '() '(1 2 3))
-;(1 (2 (3 ())))
-(fold-left list '() '(1 2 3))
-;(((() 1) 2) 3)
+(fold-right list '() '(1 2 3));(1 (2 (3 ())))
+(fold-left list '() '(1 2 3));(((() 1) 2) 3)
 
 
 ;; the op must be associative
@@ -1642,7 +1666,6 @@ s
 ;(1 + 2)+ 3 = 6
 ; 1 +(2 + 3) = 6
 |#
-
 
 
 '(exercise 2 39)#|
@@ -1679,6 +1702,22 @@ s
 (reverse! '(1 2 3 4))
 |#
 
+
+
+(define (create-group n)
+  (map (lambda (i)
+         (map (lambda (j)(list i j))
+              (enumerate-interval 1 (- i 1))))
+       (enumerate-interval 1 n)))
+;(create-group 5)
+#|
+(()
+ ((2 1))
+ ((3 1) (3 2))
+ ((4 1) (4 2) (4 3))
+ ((5 1) (5 2) (5 3) (5 4)))
+|#
+
 (define (create-pair n)
   (accumulate append
               '()
@@ -1686,13 +1725,52 @@ s
                      (map (lambda (j)(list i j))
                           (enumerate-interval 1 (- i 1))))
                    (enumerate-interval 1 n))))
+;(create-pair 5)
+#|
+((2 1)
+ (3 1)
+ (3 2)
+ (4 1)
+ (4 2)
+ (4 3)
+ (5 1)
+ (5 2)
+ (5 3)
+ (5 4))
+|#
 
 (define (flatmap proc seq)
   (accumulate append '() (map proc seq))) 
 ;(map square '(1 2 3 4))
 ;(1 4 9 16)
 ;(flatmap (lambda (x)(cons x (list x))) '(1 2 3 4))
+;(flatmap (lambda (x)(list x x)) '(1 2 3 4))
 ;(1 1 2 2 3 3 4 4)
+
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+      initial
+      (op (car sequence)
+          (accumulate op initial (cdr sequence)))))
+
+(define (create-pair n)
+  (flatmap (lambda (i)
+             (map (lambda (j)(list i j))
+                  (enumerate-interval 1 (- i 1))))
+           (enumerate-interval 1 n)))
+;(create-pair 5)
+#|
+((2 1)
+ (3 1)
+ (3 2)
+ (4 1)
+ (4 2)
+ (4 3)
+ (5 1)
+ (5 2)
+ (5 3)
+ (5 4))
+|#
 
 (define (smallest-divisor n)
   (define (find-divisor n test-divisor)
@@ -1758,7 +1836,7 @@ s
 ;((1 2 3) (1 3 2) (2 1 3) (2 3 1) (3 1 2) (3 2 1))
 
 
-'(exercise 2 40)#|
+'(exercise 2 40)#||#
 (define (unique-pairs n)
   (flatmap (lambda (i)
              (map (lambda (j)(list i j))
@@ -1773,19 +1851,18 @@ s
 
 ;(prime-sum-pairs 5)
 ;((2 1 3) (3 2 5) (4 1 5) (4 3 7) (5 2 7))
-|#
 
 
-'(exercise 2 41)#|
+
+'(exercise 2 41)#||#
 (define (enumerate-triples n)
   (flatmap (lambda (i)
-         (flatmap (lambda (j)
-                (map (lambda (k)
-                       (list i j k))
-                     (enumerate-interval 1 (- j 1))))
-              (enumerate-interval 1 (- i 1))))
-       (enumerate-interval 1 n)))
-
+             (flatmap (lambda (j)
+                        (map (lambda (k)
+                               (list i j k))
+                             (enumerate-interval 1 (- j 1))))
+                      (enumerate-interval 1 (- i 1))))
+           (enumerate-interval 1 n)))
 
 ;(enumerate-triples 5)
 
@@ -1795,7 +1872,7 @@ s
 
 ;(triples-with-fixed-sum 10 5)
 ;((5 3 2) (5 4 1))
-|#
+
 
 
 '(exercise 2 42)#|
@@ -1816,11 +1893,26 @@ s
           (queen-cols (- k 1))))))
   (queen-cols board-size))
 
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        (list empty-board)
+        (filter
+         (lambda (positions)(safe? k positions))
+         (flatmap (lambda (rest-of-queens)
+                    (map (lambda (new-row)
+                           (adjoin-position new-row k rest-of-queens))
+                         (enumerate-interval 1 board-size)))
+                  (queen-cols (- k 1))))))
+  (queen-cols board-size))
+
 (define empty-board '())
 
 ;; constructor
 (define (place-queen rank file)
-  (cons rank (cons file '())))
+  (list rank file))
+;simplify
+(define place-queen list)
 
 ;; selectors
 (define (queen-rank queen)
@@ -1864,7 +1956,8 @@ s
                             other-queens))))))
 
 (queens 4)
-;(((3 4) (1 3) (4 2) (2 1))((2 4) (4 3) (1 2) (3 1)))
+;(((3 4) (1 3) (4 2) (2 1))
+; ((2 4) (4 3) (1 2) (3 1)))
 
 ;; another one
 (define (queens board-size)
@@ -1886,9 +1979,9 @@ s
 (define (adjoin-position new-row k rest-of-queens)
   (cons new-row rest-of-queens))
 
-(define (safe? k position)
-    (iter-check (car position) 
-                (cdr position)
+(define (safe? k positions)
+    (iter-check (car positions) 
+                (cdr positions)
                  1))
 
 (define (iter-check row-of-new-queen rest-of-queens i)
@@ -1903,7 +1996,8 @@ s
                             (cdr rest-of-queens)
                             (+ i 1))))))   
 
-(queens 8)|#
+(queens 8)
+|#
 
 
 '(exercise 2 43)#|
@@ -1928,7 +2022,8 @@ s
 
 
 
-#|
+'(exercise 2 44)#|
+
 (define wave2 (beside wave (flip-vert wave)))
 
 (define wave4 (below wave2 wave2))
@@ -1945,8 +2040,7 @@ s
       (let ((smaller (right-split painter (- n 1))))
         (beside painter (below smaller smaller)))))
 
-|#
-'(exercise 2 44)#|
+
 
 (define (up-split painter n)
   (if (= n 0)
@@ -1966,17 +2060,16 @@ s
           (besides (below painter top-left)
                    (below (bottom-right corner)))))))
 
-(define (squara-limit painter n)
+(define (square-limit painter n)
   (let ((quarter (corner-split painter n)))
     (let ((half (beside (flip-horiz quarter) quarter)))
-      (below (flip-vert half) half)))
-
+      (below (flip-vert half) half))))
 
 (define (square-of-four tl tr bl br)
   (lambda (painter)
     (let ((top (beside (tl painter)(tr painter)))
           (bottom (beside (bl painter)(br painter))))
-      (below bottom top))))
+      (below bottm top))))
 
 (define (flipped-pairs painter)
   (let ((combine4 (square-of-four identity flip-vert
@@ -2003,8 +2096,9 @@ s
       painter
       (let ((smaller (up-split painter (- n 1))))
         (below painter (beside smaller smaller)))))
-
 |#
+
+
 '(exercise 2 45)#|
 
 (define right-split (split beside below))
@@ -2031,6 +2125,7 @@ s
 (origin-frame frame)
 
 |#
+
 '(exercise 2 46)#|
 
 (define make-vect cons)
@@ -2076,8 +2171,8 @@ s
         ((frame-coord-map frame)(start-segment segment))
         ((frame-coord-map frame)(end-segment segment))))
      segment-list)))
-
 |#
+
 '(exercise 2 48)#|
 
 (define make-segment cons)
