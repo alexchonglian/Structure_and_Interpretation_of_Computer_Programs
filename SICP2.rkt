@@ -2413,8 +2413,6 @@ skip
                                        (multiplicand exp))))
         (else (display "unknown expression type"))))
 
-
-
 (define (variable? x) (symbol? x))
 
 (define (same-variable? v1 v2)
@@ -2496,8 +2494,6 @@ skip
                                     (list '- (exponent exp) 1)))
            (deriv  (base exp) var))))
         (else (display "unknown expression type"))))
-
-
 
 (define (make-exponentiation base exponent)
   (cond ((=number? base 0) 0)
@@ -2612,16 +2608,18 @@ skip
   (define (iter s1-left result)
     (cond 
       ((null? s1-left) result)
-      ((element-of-set? (car s1-left) result) (iter (cdr s1-left) result))
+      ((element-of-set? (car s1-left) result)
+       (iter (cdr s1-left) result))
       (else (iter (cdr s1-left) (cons (car s1-left) result)))))
   (iter s1 s2))
 ;(union-set '(1 2 3) '(2 3 4))
+
 
 ;;recursive
 (define (union-set s1 s2)
   (cond ((null? s2) s1)
         ((element-of-set? (car s2) s1)
-         (union-sets1 (cdr s2)))
+         (union-set s1 (cdr s2)))
         (else (cons (car s2) (union-set s1 (cdr s2))))))
 ;(union-set '(1 2 3) '(2 3 4))
 
@@ -2648,12 +2646,17 @@ skip
 (define (intersection-set s1 s2)
   (if (or (null? s1) (null? s2))
       '()
-      (let ((x1 (car s1))
-            (x2 (car s2)))
+      (let ((h1 (car s1))
+            (h2 (car s2))
+            (t1 (cdr s1))
+            (t2 (cdr s2)))
         (cond
-          ((= x1 x2) (cons x1 (intersection-set (cdr s1)(cdr s2))))
-          ((< x1 x2) (intersection-set (cdr s1) s2))
-          ((> x1 x2) (intersection-set s1 (cdr s2)))))))
+          ((= h1 h2) (cons h1 (intersection-set t1 t2)))
+          ((< h1 h2) (intersection-set t1 s2))
+          ((> h1 h2) (intersection-set s1 t2))))))
+
+;(intersection-set '(1 2 3 4) '(2 3 4 5))
+;(2 3 4)
 
 
 '(exercise 2 61)
@@ -2672,12 +2675,14 @@ skip
   (cond ((null? s1) s2)
         ((null? s2) s1)
         (else
-         (let ((x1 (car s1))
-               (x2 (car s2)))
+         (let ((head1 (car s1))
+               (head2 (car s2))
+               (tail1 (cdr s1))
+               (tail2 (cdr s2)))
            (cond
-             ((= x1 x2) (cons x1 (union-set (cdr s1)(cdr s2))))
-             ((< x1 x2) (cons x1 (union-set (cdr s1) s2)))
-             ((> x1 x2) (cons x2 (union-set s1 (cdr s2)))))))))
+             ((= head1 head2) (cons head1 (union-set tail1 tail2)))
+             ((< head1 head2) (cons head1 (union-set tail1 s2)))
+             ((> head1 head2) (cons head2 (union-set s1 tail2))))))))
 
 ;(union-set '(2 4 6 8) '(1 3 5 7 9))
 ;(1 2 3 4 5 6 7 8 9)
@@ -2752,6 +2757,7 @@ skip
 ;T(n) = O(n)
 |#
 
+
 '(exercise 2 64)#|
 (define (list-tree elements)
   (car (partial-tree elements (length elements))))
@@ -2777,12 +2783,13 @@ skip
 ;(5 (1 () (3 () ())) (7 () (9 () ())))
 ;calling >>>
 
-(car (partial-tree '(1 3 5 7 9) 5))
+;(car (partial-tree '(1 3 5 7 9) 5))
 ;((5 (1 () (3 () ())) (7 () (9 () ()))))
 ;left-size = 2
 ;calling >>>
 
-;(partial-tree '(1 3 5 7 9) 2)
+(partial-tree '(1 3 5 7 9) 5)
+(partial-tree '(1 3 5 7 9) 2)
 ;((1 () (3 () ())) 5 7 9)
 ;calling >>>
 
@@ -2888,22 +2895,114 @@ Tree-Result
                     (make-leaf-set (cdr pairs))))))
 
 
+(define (make-leaf-set pairs)
+  (if (null? pairs?)
+      '()
+      (let ((pair (car pairs)))
+        (adjoin-set (make-leaf (car pair)
+                               (cadr pair))
+                    (make-leaf-set (cdr pairs))))))
+
+
 '(exercise 2 67)
 (define sample-tree
   (make-code-tree (make-leaf 'A 4)
-                  (make-code-tree
-                   (make-leaf 'B 2)
-                   (make-code-tree (make-leaf 'D 1)
-                                   (make-leaf 'C 1)))))
-sample-tree
+                  (make-code-tree (make-leaf 'B 2)
+                                  (make-code-tree (make-leaf 'D 1)
+                                                  (make-leaf 'C 1)))))
 
-(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+;sample-tree
 
-;(decode sample-message sample-tree)
+;; make the structure more obvious
+(define TREE make-code-tree)
+(define leaf make-leaf)
+
+(define sample-tree 
+  (TREE (leaf 'A 4)
+        (TREE (leaf 'B 2)             
+              (TREE (leaf 'D 1)
+                    (leaf 'C 1)))))
+
+
+; (Tree (O) (O) {abcd} 8)
+;       /     \
+;      0       1
+;     /         \
+; [lf a 4]    (Tree (O) (O) {bcd} 4)
+;                   /     \
+;                  0       1
+;                 /         \
+;            [lf b 2]     (Tree (O) (O) {cd} 2)
+;                               /     \
+;                              0       1
+;                             /         \
+;                       [lf d 1]       [lf c 1]
+;
+;        a => 0
+;        b => 10
+;        c => 111
+;        d => 110
+
+
+;sample-tree
+(define sample-bits '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+(define sample-messages '(a d a b b c a))
+
+;(decode sample-bits sample-tree)
 ;(a d a b b c a)
 
 
-'(exercise 2 68)#|
+'(exercise 2 68)
+;;encode without using encode-symbol
+(define (encode chars tree)
+  (define (encode-1 chars current-branch)
+    (define (branch-correct? sym branch)(memq sym (symbols branch)))
+    (if (null? chars)
+        '()
+        (let ((lb (left-branch current-branch))
+              (rb (right-branch current-branch)))
+          (cond 
+            ((branch-correct? (car chars) lb)
+             (if (leaf? lb)
+                 (cons 0 (encode-1 (cdr chars) tree))
+                 (cons 0 (encode-1 chars lb)))) 
+            ((branch-correct? (car chars) rb)
+             (if (leaf? rb)
+                 (cons 1 (encode-1 (cdr chars) tree))
+                 (cons 1 (encode-1 chars rb)))) 
+            (else (display "wrong msg asho")))))) 
+  (encode-1 chars tree))
+
+;(encode '(a d a b b c a) sample-tree)
+
+;; recursive
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree)
+              (encode (cdr message) tree))))
+
+(define (encode-symbol smb tree)
+  (define (branch-correct? branch)
+    (memq smb (symbols branch)))
+  (let ((lb (left-branch tree)) 
+        (rb (right-branch tree)))
+    (cond ((branch-correct? lb)(if (leaf? lb)
+                                   '(0)
+                                   (cons 0 (encode-symbol smb lb)))) 
+           ((branch-correct? rb)(if (leaf? rb)
+                                    '(1)
+                                    (cons 1 (encode-symbol smb rb)))) 
+           (else (display "wrong msg asho"))))) 
+
+(encode-symbol 'a sample-tree)
+(encode-symbol 'b sample-tree)
+(encode-symbol 'c sample-tree)
+(encode-symbol 'd sample-tree)
+(encode '(a d a b b c a) sample-tree)
+
+
+;iterative
 (define (encode message tree)
   (if (null? message)
       '()
@@ -2920,8 +3019,13 @@ sample-tree
             (iter (right-branch tree) (cons 1 bits)))
            (else (display "not found"))))
    (iter tree '()))
+
+(encode-symbol 'a sample-tree)
+(encode-symbol 'b sample-tree)
+(encode-symbol 'c sample-tree)
+(encode-symbol 'd sample-tree)
 (encode '(a d a b b c a) sample-tree)
-|#
+
 
 
 
