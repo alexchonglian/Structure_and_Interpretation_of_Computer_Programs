@@ -2895,15 +2895,6 @@ Tree-Result
                     (make-leaf-set (cdr pairs))))))
 
 
-(define (make-leaf-set pairs)
-  (if (null? pairs?)
-      '()
-      (let ((pair (car pairs)))
-        (adjoin-set (make-leaf (car pair)
-                               (cadr pair))
-                    (make-leaf-set (cdr pairs))))))
-
-
 '(exercise 2 67)
 (define sample-tree
   (make-code-tree (make-leaf 'A 4)
@@ -2995,11 +2986,11 @@ Tree-Result
                                     (cons 1 (encode-symbol smb rb)))) 
            (else (display "wrong msg asho"))))) 
 
-(encode-symbol 'a sample-tree)
-(encode-symbol 'b sample-tree)
-(encode-symbol 'c sample-tree)
-(encode-symbol 'd sample-tree)
-(encode '(a d a b b c a) sample-tree)
+;(encode-symbol 'a sample-tree)
+;(encode-symbol 'b sample-tree)
+;(encode-symbol 'c sample-tree)
+;(encode-symbol 'd sample-tree)
+;(encode '(a d a b b c a) sample-tree)
 
 
 ;iterative
@@ -3020,20 +3011,339 @@ Tree-Result
            (else (display "not found"))))
    (iter tree '()))
 
-(encode-symbol 'a sample-tree)
-(encode-symbol 'b sample-tree)
-(encode-symbol 'c sample-tree)
-(encode-symbol 'd sample-tree)
-(encode '(a d a b b c a) sample-tree)
+;(encode-symbol 'a sample-tree)
+;(encode-symbol 'b sample-tree)
+;(encode-symbol 'c sample-tree)
+;(encode-symbol 'd sample-tree)
+;(encode '(a d a b b c a) sample-tree)
+
+'(exercise 2 69)
+(define (generate-huffman-tree pairs)
+  (successive-merge (make-leaf-set pairs)))
+
+(define (successive-merge ordlist)
+  (if (null? (cdr ordlist))
+      (car ordlist)
+      (successive-merge
+       (adjoin-set (make-code-tree (car ordlist)(cadr ordlist))
+                                    (cddr ordlist)))))
+
+;(generate-huffman-tree '((a 4) (b 2) (c 1) (d 1)))
+;(generate-huffman-tree '((a 1)))
 
 
 
+'(exercise 2 70)
+(define rocktree (generate-huffman-tree 
+                  '((A 2) (NA 16) (BOOM  1) (SHA 3)
+                    (GET 2) (YIP 9) (JOB 2) (WAH 1)))) 
+
+(define rocksong '(
+        Get a job 
+        Sha na na na na na na na na 
+        Get a job 
+        Sha na na na na na na na na 
+        Wah yip yip yip yip yip yip yip yip yip
+        Sha boom
+        ))
+
+(define encodedrocksong (encode rocksong rocktree)) 
+
+; length of encoded message using Huffman tree
+;(length encodedrocksong);84 
+  
+; If we were to use a fixed-length encoding on that rock song, 
+; we would need 3 bits (8 = 2^3) per symbol
+;(* 3 (length rocksong)) ;108 
+
+
+'(exercise 2 71)#|
+
+The tree is unbalanced
+
+n=5:
+                     {a b c d e} 31
+                     /           \
+                {a b c d} 15      e 16
+                 /     \
+           {a b c} 7    d 8
+             /    \
+        {a b} 3    c 4
+         /   \
+      a 1    b 2
+      
+
+
+n=10                                {abcdefghij}1023
+                                     /              \
+                                  {abcdefghij}511    j 512
+                                  /           \
+                             {abcdefgh}255     i 512
+                              /           \
+                          {abcdefg}127    h 256
+                          /          \
+                      {abcdef}63     g 64
+                      /        \
+                  {abcde}31    f 32
+                  /       \
+              {abcd}15    e 16
+              /     \
+           {abc}7   d 8
+           /    \
+         {ab}3  c 4
+         /   \
+      a 1    b 2
+
+1 bit is required to encode the most frequent symbol
+n-1 bits are required to encode the least frequent symbol
+
+|#
+
+
+'(exercise 2 72)
+;encoding the most frequent symbol requires search in symbol list
+;O(n)
+
+;encoding the least frequent requires a diminishing search in symbol list
+;as the element traverse down the huffman tree
+;O(n^2)
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 2.4 Multiple Representations for Abstract Data
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
+(define (add-complex z1 z2)
+  (make-from-real-img (+ (real-part z1) (real-part z2))
+                      (+ (imag-part z1) (imag-part z2))))
+
+(define (sub-complex z1 z2)
+  (make-from-real-img (- (real-part z1) (real-part z2))
+                      (- (imag-part z1) (imag-part z2))))
+
+(define (mul-complex z1 z2)
+  (make-from-mag-ang (* (magnitude z1) (magnitude z2))
+                     (+ (angle z1) (angle z2))))
+
+(define (div-complex z1 z2)
+  (make-from-mag-ang (/ (magnitude z1) (magnitude z2))
+                     (- (angle z1) (angle z2))))
+
+
+;; Ben's representation
+
+(define (real-part! z) (car z))
+
+(define (imag-part! z) (cdr z))
+
+(define (magnitude! z)
+  (sqrt (+ (square (real-part! z)) (square (imag-part! z)))))
+
+(define (angle! z)
+  (atan (imag-part! z) (real-part! z)))
+
+(define (make-from-real-imag x y) (cons x y))
+
+(define (make-from-mag-ang r a)
+  (cons (* r (cos a)) (* r (sin a))))
+
+;; Alyssa's representation
+
+(define (real-part! z)
+  (* (magnitude! z) (cos (angle! z))))
+
+(define (imag-part! z)
+  (* (magnitude! z) (sin (angle! z))))
+
+(define (magnitude! z) (car z))
+
+(define (angle! z) (cdr z))
+
+(define (make-from-real-imag x y)
+  (cons (sqrt (+ (square x) (square y)))
+        (atan y x)))
+
+(define (make-from-mag-ang r a) (cons r a))
+
+
+;;use tag
+(define (attach-tag type-tag contents)
+  (cons type-tag contents))
+
+(define (type-tag datum)
+  (if (pair? datum)
+      (car datum)
+      (display "sth wrong")))
+
+(define (contents datum)
+  (if (pair? datum)
+      (cdr datum)
+      (display "sth wrong")))
+
+(define (rectangular? z)
+  (eq? (type-tag z) 'rectangular))
+
+(define (polar? z)
+  (eq? (type-tag z) 'polar))
+
+
+;; Rewrite Ben's 
+
+(define (real-part-rectangular z) (car z))
+
+(define (imag-part-rectangular z) (cdr z))
+
+(define (magnitude-rectangular z)
+  (sqrt (+ (square (real-part-rectangular z))
+           (square (imag-part-rectangular z)))))
+
+(define (angle-rectangular z)
+  (atan (imag-part-rectangular z)
+        (real-part-rectangular z)))
+
+(define (make-from-real-imag-rectangular x y) 
+  (attach-tag 'rectangular (cons x y)))
+
+(define (make-from-mag-ang-rectangular r a)
+  (attach-tag 'rectangular
+              (cons (* r (cos a)) (* r (sin a)))))
+
+;; Rewrite Alyssa's 
+
+(define (real-part-polar z)
+  (* (magnitude-polar z) (cos (angle-polar z))))
+
+(define (imag-part-polar z)
+  (* (magnitude-polar z) (sin (angle z))))
+
+(define (magnitude-polar z) (car z))
+
+(define (angle-polar z) (cdr z))
+
+(define (make-from-real-imag-polar x y)
+  (attach-tag 'polar
+              (cons (sqrt (+ (square x) (square y)))
+                    (atan y x))))
+
+(define (make-from-mag-ang-polar r a)
+  (attach-tag 'polar (cons r a)))
+
+
+;; Generic
+
+(define (real-part! z)
+  (cond
+    ((rectangular? z)(real-part-rectangular (contents z)))
+    ((polar? z)(real-part-polar (contents z)))
+    (else (display "unknown type"))))
+
+(define (imag-part! z)
+  (cond
+    ((rectangular? z)(imag-part-rectangular (contents z)))
+    ((polar? z)(imag-part-polar (contents z)))
+    (else (display "unknown type"))))
+
+(define (magnitude! z)
+  (cond
+    ((rectangular? z)(magnitude-rectangular (contents z)))
+    ((polar? z)(magnitude-polar (contents z)))
+    (else (display "unknown type"))))
+
+(define (angle! z)
+  (cond
+    ((rectangular? z)(angle-rectangular (contents z)))
+    ((polar? z)(angle-polar (contents z)))
+    (else (display "unknown type"))))
+
+(define (add-complex z1 z2)
+  (make-from-real-imag (+ (real-part! z1) (real-part! z2))
+                       (+ (imag-part! z1) (imag-part! z2))))
+
+(define (make-from-real-imag x y)
+  (make-from-real-imag-rectangular x y))
+
+(define (make-from-mag-ang r a)
+  (make-from-mag-ang-polar r a))
+
+
+;; (put <op> <type> <item>)
+;; (get <op> <type>)
+
+;; packages
+
+(define (install-rectangular-package)
+  ;; internal procedures
+  (define (real-part! z) (car z))
+  (define (imag-part! z) (cdr z))
+  (define (make-from-real-imag x y) (cons x y))
+  (define (magnitude! z)
+    (sqrt (+ (square (real-part! z))
+             (square (imag-part! z)))))
+  (define (angle! z)
+    (atan (imag-part! z) (real-part! z)))
+  (define (make-from-mag-ang r a)
+    (cons (* r (cos a)) (* r (sin a))))
+  
+  ;; interface to the rest of the system
+  (define (tag x)(attach-tag 'rectangular))
+  (put 'real-part! '(rectangular) real-part!)
+  (put 'imag-part! '(rectangular) imag-part!)
+  (put 'magnitude! '(rectangular) magnitude!)
+  (put 'angle! '(rectangular) angle!)
+  (put 'make-from-real-imag 'rectangular
+        (lambda (x y) (tag (make-from-real-imag x y))))
+  (put 'make-from-mag-ang 'rectangular
+        (lambda (r a) (tag (make-from-mag-and r a))))
+  'done)
+
+
+(define (install-polar-package)
+  ;; internal procedures
+  (define (magnitude! z) (car z))
+  (define (angle! z) (cdr z))
+  (define (make-from-mag-ang r a) (cons r a))
+  (define (real-part! z)
+    (* (magnitude! z) (cos (angle! z))))
+  (define (imag-part! z)
+    (* (magnitude! z) (sin (angle! z))))
+  (define (make-from-real-imag x y)
+    (cons (sqrt (+ (square x) (square y)))
+          (atan y x)))
+  
+  ;; interface to the rest of the system
+  (define (tag x) (attach-tag ’polar x))
+  (put ’real-part! ’(polar) real-part!)
+  (put ’imag-part! ’(polar) imag-part!)
+  (put ’magnitude! ’(polar) magnitude!)
+  (put ’angle! ’(polar) angle!)
+  (put ’make-from-real-imag ’polar
+       (lambda (x y) (tag (make-from-real-imag x y))))
+  (put ’make-from-mag-ang ’polar
+       (lambda (r a) (tag (make-from-mag-ang r a))))
+’done)
+
+
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (apply proc (map contents args))
+          (display "goes wrong")))))
+
+
+(define (real-part! z) (apply-generic 'real-part! z))
+(define (imag-part! z) (apply-generic 'imag-part! z))
+(define (magnitude! z) (apply-generic 'magnitude! z))
+(define (angle! z) (apply-generic 'angle! z))
+
+(define (make-from-real-imag x y)
+  ((get 'make-from-real-imag 'rectangular) x y))
+
+(define (make-from-mag-ang r a)
+  ((get 'make-from-mag-ang 'polar) r a))
 
 
 
