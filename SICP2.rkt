@@ -3333,6 +3333,13 @@ n-1 bits are required to encode the least frequent symbol
           (apply proc (map contents args))
           (display "goes wrong")))))
 
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (apply proc (map contents args))
+          (display "goes wrong")))))
+
 
 (define (real-part! z) (apply-generic 'real-part! z))
 (define (imag-part! z) (apply-generic 'imag-part! z))
@@ -3344,6 +3351,177 @@ n-1 bits are required to encode the least frequent symbol
 
 (define (make-from-mag-ang r a)
   ((get 'make-from-mag-ang 'polar) r a))
+
+
+'(exercise 2 73)
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp) (if (same-variable? exp var) 1 0))
+        ((sum? exp) (make-sum (deriv (addend exp) var)
+                              (deriv (augend exp) var)))
+        ((product? exp) (make-sum
+                         (make-product (multiplier exp)
+                                       (deriv (multiplicand exp) var))
+                         (make-product (deriv (multiplier exp) var)
+                                       (multiplicand exp))))
+        ; <more rules can be added here>
+        (else (display "unknown expression type"))))
+
+(define (variable? x) (symbol? x))
+
+(define (same-variable? v1 v2)
+  (and (variable? v1)(variable? v2))(eq? v1 v2))
+
+(define (make-sum x1 x2)
+  (cond ((and (number? x1) (number? x2)) (+ x1 x2)) 
+        ((=number? x1 0) x2) 
+        ((=number? x2 0) x1) 
+        (else (list '+ x1 x2)))) 
+
+(define (make-product x1 x2) 
+  (cond ((and (number? x1) (number? x2)) (* x1 x2)) 
+        ((=number? x1 1) x2) 
+        ((=number? x2 1) x1) 
+        ((or (=number? x1 0) (=number? x2 0)) 0) 
+        (else (list '* x1 x2)))) 
+
+(define (sum? x)
+  (and (pair? x) (eq? (car x) '+)))
+
+(define (addend s) (cadr s))
+
+(define (augend s) (caddr s))
+
+(define (product? x)
+  (and (pair? x) (eq? (car x) '*)))
+
+(define (multiplier p)(cadr p))
+
+(define (multiplicand p)(caddr p))
+
+;; testing
+(deriv '(+ 2 x) 'x);1
+(deriv '(+ y x) 'x);1
+(deriv '(* 2 x) 'x);2
+(deriv '(* y x) 'x);y
+
+;; rewrite as data-directed style
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp) (if (same-variable? exp var) 1 0))
+        (else
+         ((get 'deriv (operator exp)) (operands exp) var))))
+
+(define (operator exp) (car exp))
+
+(define (operands exp) (cdr exp))
+
+
+;; a 
+;number? same-variable? are general predicates across all operations
+
+;; b
+;install sum
+(define (install-sum-package)
+  (define (make-sum x1 x2)
+    (cond ((and (number? x1) (number? x2)) (+ x1 x2)) 
+          ((=number? x1 0) x2) 
+          ((=number? x2 0) x1) 
+          (else (list '+ x1 x2)))) 
+  (define (addends s) (cadr s))
+  (define (augends s) (caddr s))
+  (define (deriv-sum s var)
+    (make-sum (deriv (addend s) var)
+              (deriv (augend s) var)))
+  
+  (define (tag x) (attach-tag '+ x))
+  (put 'deriv '(+) deriv-sum)
+  (put 'make-sum '+
+       (lambda (x y) (tag (make-sum x y))))
+  'done)
+
+;install product
+(define (install-product-package)
+  (define (make-product x1 x2) 
+    (cond ((and (number? x1) (number? x2)) (* x1 x2)) 
+          ((=number? x1 1) x2) 
+          ((=number? x2 1) x1) 
+          ((or (=number? x1 0) (=number? x2 0)) 0) 
+          (else (list '* x1 x2)))) 
+  (define (multiplier p) (cadr p))
+  (define (multiplicand p) (caddr p))
+  (define (deriv-product p var)
+    (make-sum (make-product (multiplier p var)
+                            (deriv (multiplicand p) var))
+              (make-product (deriv (multiplier p) var)
+                            (multiplicand p var))))
+  
+  (define (tag x) (attach-tag '* x))
+  (put 'deriv '(*) deriv-product)
+  (put 'make-product '*
+       (lambda (x y) (tag (make-product x y))))
+  'done)
+
+;; product package use make-sum
+(define (make-sum x y) 
+  ((get 'make-sum '+) x y)) 
+
+(define (make-product x y)
+  ((get 'make-product '*) x y)) 
+
+(define (deriv x) (apply-generic 'deriv x))
+
+
+;; c
+;install exponentiation
+(define (install-exponentiation-package)
+  (define (make-expo base exponent) 
+    (cond ((=number? exponent 0) 1) 
+          ((=number? exponent 1) base) 
+          ((=number? base 1) 1) 
+          (else (list '^ base exponent))))
+  (define (base expr)(cadr expr)) 
+  (define (exponent expr)(caddr expr)) 
+  (define (expo-deriv expr var) 
+    (make-product (exponent expr) 
+                  (make-product  
+                   (make-expo (base expr)(make-sum (exponent expr) -1)) 
+                   (deriv (base expr) var)))) 
+  
+  (define (tag x) (attach-tag '^ x))
+  (put 'deriv '(^) deriv-expo)
+  (put 'make-expo '^
+       (lambda (x y) (tag (make-expo x y))))
+  'done)
+
+
+
+(define (make-expo x y)
+  ((get 'make-expo '*) x y)) 
+
+
+;; d
+
+; if dispatch line is
+; ((get 'deriv (operator exp)) (operands exp) var)
+; get changed to
+; ((get (operator exp) ’deriv) (operands exp) var)
+; what corresponding changes to the deriv system are required?
+
+; rewrite get function
+; transpose the package database, maybe
+; nothing particular jump to mind
+
+
+
+
+
+
+
+
+
+
+
 
 
 
