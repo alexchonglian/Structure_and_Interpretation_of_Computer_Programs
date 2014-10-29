@@ -3353,7 +3353,7 @@ n-1 bits are required to encode the least frequent symbol
   ((get 'make-from-mag-ang 'polar) r a))
 
 
-'(exercise 2 73)
+'(exercise 2 73)#|
 (define (deriv exp var)
   (cond ((number? exp) 0)
         ((variable? exp) (if (same-variable? exp var) 1 0))
@@ -3512,16 +3512,122 @@ n-1 bits are required to encode the least frequent symbol
 ; transpose the package database, maybe
 ; nothing particular jump to mind
 
+|#
+
+'(exercise 2 74)#|
+;; a
+(define (attach-tag type-tag contents)
+  (cons type-tag contents))
+
+(define (type-tag datum)
+  (if (pair? datum)
+      (car datum)
+      (display "sth wrong")))
+
+(define (contents datum)
+  (if (pair? datum)
+      (cdr datum)
+      (display "sth wrong")))
+
+(define (get-record employee tagged-file)
+  ((get 'get-record (division tagged-file))
+   employee (original-file tagged-file)))
+
+; tag division name to file to make it generic
+(define (make-tagged-file division file)
+  (cons division file))
+
+(define (division tagged-file)
+  (if (pair? tagged-file)
+      (car tagged-file)
+      (display "sth wrong")))
+
+(define (original-file tagged-file)
+  (if (pair? tagged-file)
+      (cdr tagged-file)
+      (display "sth wrong")))
+  
+
+;; b
+(define (get-salary employee tagged-record)
+  ((get 'get-salary (division tagged-record))
+   employee (original-record tagged-record)))
+
+; tagging division name to file to make it generic
+(define (make-tagged-record division record)
+  (cons division record))
+
+(define (division tagged-record)
+  (if (pair? tagged-record)
+      (car tagged-record)
+      (display "sth wrong")))
+
+(define (original-record tagged-record)
+  (if (pair? tagged-record)
+      (cdr tagged-record)
+      (display "sth wrong")))
+
+;; im aware that a & b are repetitive, we can DRY it up
+;; its obvious how to do it, so i just skip it, cuz im too lazy
+
+;c
+; assume each division provide their implemention of in-this-division?
+(define (find-employee-record employee files)
+  (cond ((null? files) '())
+        ((in-division? employee (division (car files)))
+         ;; consider the possibility that one person in multiple division
+         ;; consider employees with same name
+         (cons (get-record employee (car files))
+               (find-employee-record employee (cdr files))))
+        (else (find-employee-record employee (cdr files)))))
+
+(define (in-division? employee division)
+  ((get 'in-division? division) employee))
 
 
+;d
+;ask them to tag it and provide require procs/preds such as in-division?
+
+|#
+
+(define (make-from-real-imag x y)
+  (define (dispatch op)
+    (cond ((eq? op 'real-part) x)
+          ((eq? op 'imag-part) y)
+          ((eq? op 'magnitude) (sqrt (+ (square x) (square y))))
+          ((eq? op 'angle) (atan y x))
+          (else (display "sth wrong"))))
+  dispatch)
 
 
+;(define x (make-from-real-imag 4 3))
+;(x 'real-part);4
+;(x 'imag-part);3
+;(x 'magnitude);5
+;(x 'angle);0.6435011087932844
+
+(define (apply-generic op arg) (arg op))
 
 
+'(exercise 2 75)
+(define (make-from-mag-ang r a)
+  (define (dispatch op)
+    (cond ((eq? op 'real-part) (* r (cos a)))
+          ((eq? op 'imag-part) (* r (sin a)))
+          ((eq? op 'magnitude) r)
+          ((eq? op 'angle) a)
+          (else (display "sth wrong"))))
+  dispatch)
 
+;(define x (make-from-mag-ang 5 0.6435011087932844))
+;(x 'real-part);4
+;(x 'imag-part);3
+;(x 'magnitude);5
+;(x 'angle);0.6435011087932844
 
-
-
+'(exercise 2 76)
+;Data-directed => new types often added
+;Message-passing => new operations often added
 
 
 
