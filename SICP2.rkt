@@ -3032,6 +3032,8 @@ Tree-Result
 ;(generate-huffman-tree '((a 1)))
 
 
+;(generate-huffman-tree '((A 25) (B 25) (C  20) (D 15) (E 10) (F 5)) )
+
 
 '(exercise 2 70)
 (define rocktree (generate-huffman-tree 

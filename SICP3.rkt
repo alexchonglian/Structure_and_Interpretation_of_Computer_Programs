@@ -102,6 +102,7 @@
 (A 10);25
 |#
 
+
 '(exercise 3 2)#|
 '(single params)
 (define (make-monitor f)
@@ -216,6 +217,7 @@
 |#
 
 
+
 '(exercise 3 4)#|
 (define (make-account balance password)
   (let ((num-fail-login 0))
@@ -238,7 +240,7 @@
           (if (>= num-fail-login 7)
               (lambda (x) (call-the-cop))
               (begin (set! num-fail-login (+ 1 num-fail-login))
-                     (lambda (x) (cons num-fail-login '(times failed)))))))
+                     (lambda (x) (list num-fail-login 'times 'failed))))))
     dispatch))
 
 (define acc (make-account 100 'secret))
@@ -263,22 +265,907 @@
 ((acc 'guess 'withdraw) 40)
 ((acc 'guess 'withdraw) 40)
 ((acc 'guess 'withdraw) 40);"call-the-cop"
+
+|#
+
+;just reminder
+
+;syntax for function that gets any number of args
+(define (f . args) args)
+;(f 1 2 3)
+
+;syntax for lambda that gets any number of args
+(define f (lambda args args))
+;(f 1 2 3)
+
+
+(define random-init 0)
+
+(define rand
+  (let ((x random-init))
+    (lambda ()
+      (set! x (rand-update x))
+      x)))
+
+(define (estimate-pi trials)
+  (sqrt (/ 6 (monte-carlo trials cesaro-test))))
+
+(define (cesaro-test)
+  (= (gcd (rand) (rand)) 1))
+
+(define (monte-carlo trials experiment)
+  (define (iter trials-remaining trials-passed)
+    (cond ((= trials-remaining 0) (/ trials-passed trials))
+          ((experiment)(iter (- trials-remaining 1) (+ trials-passed 1)))
+          (else (iter (- trials-remaining 1) trials-passed))))
+  (iter trials 0))
+
+
+; using rand-update directly (no assignment)
+
+(define (estimate-pi trials)
+  (sqrt (/ 6 (random-gcd-test trials random-init))))
+
+(define (random-gcd-test trials initial-x)
+  (define (iter trials-remaining trials-passed x)
+    (let ((x1 (rand-update x)))
+      (let ((x2 (rand-update x1)))
+        (cond
+          ((= trials-remaining 0) (/ trials-passed trials))
+          ((= (gcd x1 x2) 1) (iter (- trials-remaining 1) 
+                                   (+ trials-passed 1) x2))
+          (else (iter (- trials-remaining 1)
+                      trial-passed x2))))))
+  (iter trials 0 initial-x))
+
+
+
+'(exercise 3 5)#|
+(define (random-in-range low high)
+  (let ((range (- high low)))
+    (+ low (random range))))
+
+(define (P x y)
+  (< (+ (expt (- x 5) 2) (expt (- y 7) 2))
+     (expt 3 2)))
+
+(define (estimate-integral P x1 x2 y1 y2 trials)
+  (define (experiment)
+    (P (random-in-range x1 x2)
+       (random-in-range y1 y2)))
+  (monte-carlo trials experiment))
+
+;(estimate-integral P 2.0 8.0 4.0 10.0 100) 
 |#
 
 
+'(exercise 3 6)#|
+(define rand
+  (let ((x random-init))
+    (define (dispatch message)
+      (cond ((eq? message 'generate) 
+             (begin (set! x (rand-update x)) x))
+            ((eq? message 'reset)
+             (lambda (new-value)(set! x new-value)))))
+    dispatch))
+|#
 
 
+(define (make-simplified-withdraw balance)
+  (lambda (amount)
+    (set! balance (- balance amount))
+    balance))
+
+(define W (make-simplified-withdraw 25))
+
+;(W 20);5
+;(W 10);-5
+
+(define (make-decrementer balance)
+  (lambda (amount)
+    (- balance amount)))
+
+(define D (make-decrementer 25))
+
+;(D 20);5
+;(D 10);15
+
+;((make-decrementer 25) 20)
+;((lambda (amount) (- 25 amount)) 20)
+;(- 25 20)
 
 
+;difference between
+(define peter-acc (make-account 100))
+(define paul-acc (make-account 100))
+
+(define peter-acc (make-account 100))
+(define paul-acc peter-acc)
+
+;factorial
+(define (factorial n)
+  (define (iter product counter)
+    (if (> counter n)
+        product
+        (iter (* counter product)
+              (+ counter 1))))
+  (iter 1 1))
+
+;(factorial 5);120
+
+(define (factorial n)
+  (let ((product 1)
+        (counter 1))
+    (define (iter)
+      (if (> counter n)
+          product
+          (begin (set! product (* counter product))
+                 (set! counter (+ counter 1))
+                 (iter))))
+    (iter)))
+
+;(factorial 5);120
 
 
+'(exercise 3 7)#|
+(define (make-account balance password)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount)) balance)
+        "insufficient fund"))
+  
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  
+  (define (dispatch pswd-attempt m)
+    (if (eq? pswd-attempt password)
+        (cond ((eq? m 'withdraw) withdraw)
+              ((eq? m 'deposit) deposit)
+              (else (lambda (x) "wrong dispatcher")))
+        (lambda (x) "incorrect password")))
+  dispatch)
+
+(define acc (make-account 100 'secret))
+
+((acc 'secret 'withdraw) 40);60
+((acc 'secret 'withdraw) 40);20
+((acc 'secret 'withdraw) 40);insuf fund
+((acc 'guess 'withdraw) 40);incorrect pswd
+((acc 'secret 'deposit) 10);30
+((acc 'secret 'deposit) 10);40
+((acc 'secret 'deposit) 10);50
+((acc 'guess 'deposit) 10);"Incorrect password"
+((acc 'secret 'crazy-operation) 10);"wrong dispatcher"
+
+;; end of answer of 3.3 
+
+;; create new account
+(define acc (make-account 100 'secret))
+
+;; define make-joint
+(define (make-joint account pw-old pw-new)
+  (lambda (pw-new-attempt msg)
+    (if (eq? pw-new-attempt pw-new)
+        (account pw-old msg)
+        (lambda (x) "incorrect password"))))
+
+(define jacc (make-joint acc 'secret 'new-secret))
+
+((acc 'secret 'withdraw) 40);60
+((jacc 'new-secret 'withdraw) 40);20
+((acc 'secret 'deposit) 10);30
+((jacc 'new-secret 'withdraw) 40);"insufficient fund"
+((jacc 'guess 'withdraw) 40);"incorrect password"
+|#
 
 
+'(exercise 3 8)#|
+;; the gist is to introduce local state variable
+;; but there are many ways to achieve desired result
 
+;; shyam's version - delayed response
+(define (g y)
+  (define (f x)
+    (let ((z y))
+      (set! y x)
+      z))
+  f)
+
+(define f (g 0))
+(+ (f 0) (f 1))
+;(+ (f 1) (f 0))
+(define f (g 0))
+(+ (f 1) (f 0))
+;(+ (f 0) (f 1))
+
+
+;; my version - accumulated product
+
+(define (g)
+  (lambda (arg)
+    (let ((prod 1))
+      (set! prod (* arg prod))
+      prod)))
+
+(define (g init)
+  (lambda (arg)
+    (begin (set! init (* init arg))
+           init)))
+
+(define f (g 1))
+(+ (f 0) (f 1))
+;(+ (f 1) (f 0))
+(define f (g 1))
+(+ (f 1) (f 0))
+;(+ (f 0) (f 1))
+
+|#
 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 3.2 The Environment Model of Evaluation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; applying simple procs
+
+'(exercise 3 9)
+(define (factorial n)
+  (if (= n 1)
+      1
+      (* n (factorial (- n 1)))))
+;(factorial 5);120
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;                     params: n
+;                     body: ...
+;                        
+;                        ^
+;                        |    
+;                       [*][*]---+
+;                          ^     |
+;                          |     V
+;            +-------------|------------------------------+
+;            |             |                              |
+; global --> | factorial --+                              |
+; env        |                                            |
+;            +--------------------------------------------+
+;                 ^              ^                      ^ 
+;(factorial 6)    |              |                      |   
+;              +-----+        +-----+                +-----+    
+;         E1=> | n:6 |    E2=>| n:5 |     ...    E6=>| n:1 |       
+;              +-----+        +-----+                +-----+
+;              body of        body of                body of
+;             factorial      factorial              factorial
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define (factorial n)
+  (fact-iter 1 1 n))
+
+(define (fact-iter product counter max-count)
+  (if (> counter max-count)
+      product
+      (fact-iter (* counter product)
+                 (+ counter 1)
+                 max-count)))
+;(factorial 5);120
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;                     params: n      params: product,counter,max-counter
+;                     body: ...      body: ...
+;                        
+;                        ^                ^     
+;                        |                |          
+;                       [*][*]---+       [*][*]---+
+;                          ^     |          ^     |
+;                          |     V          |     V
+;            +-------------|----------------|-------------+
+;            |             |                |             |
+; global --> | factorial --+                |             |
+; env        | fact-iter -------------------+             |
+;            |                                            |
+;            +--------------------------------------------+
+;               ^           ^                        ^ 
+;(factorial 6)  |       E2  |                     E7 |   
+;            +-----+    +--------+                +----------+    
+;       E1=> | n:6 |    | prod:1 |                | prod:720 |      
+;            +-----+    | cntr:1 |      ...       | cntr:7   |
+;     (fact-iter 1 1 n) | max:6  |                | max:6    | 
+;                       +--------+                +----------+ 
+;                         body of                    body of
+;                        fact-iter                  fact-iter
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; frames as the repo of local state
+
+(define (make-withdraw balance)
+  (lambda (amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "insufficient funds")))
+
+(define W1 (make-withdraw 100))
+;(W1 50)
+
+
+'(exercise 3 10)
+;'(let ((var exp)) body)
+;'((lambda (var) body) exp)
+
+(define (make-withdraw initial-amount)
+  (let ((balance initial-amount))
+    (lambda (amount)
+      (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds"))))
+
+(define (make-withdraw initial-amount)
+  ((lambda (balance)
+     (lambda (amount)
+       (if (>= balance amount)
+           (begin (set! balance (- balance amount))
+                  balance)
+           "Insufficient funds")))
+   initial-amount))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; eval (define W1 (make-withdraw 100))
+;
+;                     params: initial-amount
+;                     body: ((lambda (balance)
+;                              (lambda (amount)
+;                        ^       (if (>= ...
+;                        |    
+;                       [*][*]---+
+;                          ^     |
+;                          |     V
+;            +-------------|------------------------------+
+;            | mk-wthdw----+                              |
+; global --> | W1---+                                     |
+; env        |      |                                     |
+;            +------|---------------^---------------------+
+;                   |               |      
+;                   V          +----^----+   
+;                [*][*]    E1=>|init:100 |    
+;                 |  |         +----^----+
+;                 |  |              |
+; params:amount<--+  |         +----^----+ 
+; body: (if (>= )    |     E2=>|blnc:100 |
+;            ...     |         +----^----+
+;                    |              |
+;                    +--------------+
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; apply W1, create env for {amount: 50}
+;
+;            +--------------------------------------------+
+;            | mk-wthdw: ...                              |
+; global --> | W1---+                                     |
+; env        |      |                                     |
+;            +------|---------------^---------------------+
+;                   |               |      
+;                   V          +----^----+   
+;                [*][*]    E1=>|init:100 |    
+;                 |  |         +----^----+
+;                 |  |              |
+; params:amount<--+  |         +----^----+    +----------+ 
+; body: (if (>= )    |     E2=>|blnc:100 |<---|amount:50 |
+;            ...     |         +----^----+    +----------+ 
+;                    |              |
+;                    +--------------+
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; complete calling W1, balance in E2 is modified
+;
+;            +--------------------------------------------+
+;            | mk-wthdw: ...                              |
+; global --> | W1---+                                     |
+; env        |      |                                     |
+;            +------|---------------^---------------------+
+;                   |               |      
+;                   V          +----^----+   
+;                [*][*]    E1=>|init:100 |    
+;                 |  |         +----^----+
+;                 |  |              |
+; params:amount<--+  |         +----^----+
+; body: (if (>= )    |     E2=>|blnc:50  |
+;            ...     |         +----^----+ 
+;                    |              |
+;                    +--------------+
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; create new W2 proc
+;
+;            +---------------------------------------------+
+;            | mk-wthdw: ...                               |
+; global --> | W1------------------------+                 |
+; env        | W2--+                     |                 |
+;            +-----|----------^----------|------------^----+
+;                  |          |          |            |
+;                  V     +----^----+     V       +----^----+
+;               [*][*] E1|init:100 |  [*][*]  E3 |init:100 |
+;                |  |    +----^----+   |  |      +----^----+
+;                |  |         |        |  |           |
+;                |  |    +----^----+   |  |      +----^----+
+;                |  |  E2|blnc:50  |   |  |   E4 |blnc:100 |
+;                |  |    +----^----+   |  |      +----^----+
+;                |  |         |        |  |           |
+;                |  +---------+        |  +-----------+
+;                V                     |
+;  params:amount                       |
+;  body: (if (>= ) <-------------------+
+;             ...
+;     
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; internal definitions
+
+(define (sqrt! x)
+  (define (good-enough? guess)
+    (< (abs (- (square guess) x)) 0.001))
+  (define (improve guess)
+    (average guess (/ x guess)))
+  (define (sqrt-iter guess)
+    (if (good-enough? guess)
+        guess
+        (sqrt-iter (improve guess))))
+  (sqrt-iter 1.0))
+
+
+
+'(exercise 3 11)
+(define (make-account balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (-  balance amount))
+               balance)
+        "insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (define (dispatch m)
+    (cond ((eq? m 'withdraw) withdraw)
+          ((eq? m 'deposit) deposit)
+          (else (lambda (amount) "wrong message"))))
+  dispatch)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; (define acc (make-account 50))
+;
+;                     params: balance
+;                     body: (define (withdraw amount) ...
+;                        ^  (define (deposit amount) ...
+;                        |  (define (dispatch m) ... 
+;                        |  dispatch)
+;                        |
+;                       [*][*]---+
+;                          ^     |
+;                          |     V
+;            +-------------|-------------------------------+
+;            | mk-acct:----+                               |
+; global --> |                                             |
+; env        | acc--+                                      |
+;            +------|-----------^--------------------------+
+;                   |           |
+;                   V     +-----^-------+
+;                [*][*] E1| balance: 50 |<-------o--------o--------o
+;                 |  |    |             |        |        |        |
+;                 |  |    | withdraw:------->[*][*]       |        |
+;                 |  |    | deposit:----------------->[*][*]       |
+;                 |  |    | dispatch:------------------------->[*][*]
+;                 |  +--->|             |
+;                 |       +-------------+
+;                 |  
+;                 |  
+;                 V                     
+;        params: m                     
+;        body: (cond ((eq? m 'withdraw) ... )
+;                    ((eq? m 'deposit) ...)
+;     
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; ((acc 'deposit) 40)
+;
+;            +---------------------------------------------+
+;            | mk-acct: ...                                |
+; global --> |                                             |
+; env        | acc--+                                      |
+;            +------|-----------^--------------------------+
+;                   |           |
+;                   V     +-----^-------+
+;                [*][*] E1| balance: 50 |<-------o--------o--------o
+;                 |  |    |             |        |        |        |
+;                 |  |    | withdraw:------->[*][*]       |        |
+;                 |  |    | deposit:----------------->[*][*]       |
+;                 |  |    | dispatch:------------------------->[*][*]
+;                 |  +--->|             |
+;                 |       +-------------* <---o--------------------o
+;                 |                           |                    |
+;                 |                    +----------+         +---------+
+;                 |               E2=> |m:'deposit|    E3=> |amount:40|
+;                 |                    +----------+         +---------+
+;        params: m                     
+;        body: (cond ((eq? m 'withdraw) ... )
+;                    ((eq? m 'deposit) ...)
+;     
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; ((acc 'withdraw) 60)
+;
+;            +---------------------------------------------+
+;            | mk-acct: ...                                |
+; global --> |                                             |
+; env        | acc--+                                      |
+;            +------|-----------^--------------------------+
+;                   |           |
+;                   V     +-----^-------+
+;                [*][*] E1| balance: 90 |<-------o--------o--------o
+;                 |  |    |             |        |        |        |
+;                 |  |    | withdraw:------->[*][*]       |        |
+;                 |  |    | deposit:----------------->[*][*]       |
+;                 |  |    | dispatch:------------------------->[*][*]
+;                 |  +--->|             |
+;                 |       +-------------* <---o--------------------o
+;                 |                           |                    |
+;                 |                    +----------+         +---------+
+;                 |               E4=> |m:'witdraw|    E5=> |amount:60|
+;                 |                    +----------+         +---------+
+;        params: m                     
+;        body: (cond ((eq? m 'withdraw) ... )
+;                    ((eq? m 'deposit) ...)
+;     
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 3.3 Modelling with Mutable Data
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define x '((a b) c d))
+(define y '(e f))
+
+;x
+;y
+;(set-car! x y)
+;x
+
+(define z (cons y (cdr x)))
+;z
+;x
+
+(set-cdr! x y)
+;x
+
+(define (cons! x y)
+  (define (get-new-pair) '(()))
+  (let ((new (get-new-pair)))
+    (set-car! new x)
+    (set-cdr! new y)
+    new))
+
+;(cons! 1 '(2 3 4))
+
+
+
+'(exercise 3 12)#|
+(define (append! x y)
+  (if (null? x)
+      y
+      (cons (car x) (append (cdr x) y))))
+
+(append '(1 2 3) '(4 5 6))
+(append! '(1 2 3) '(4 5 6))
+
+(define (append! x y)
+  (set-cdr! (last-pair x) y)
+  x)
+
+(define (last-pair x)
+  (if (null? (cdr x))
+      x
+      (last-pair (cdr x))))
+
+
+(append! '(1 2 3) '(4 5 6))
+(define a '(1 2 3))
+(define b '(4 5 6))
+(append! a b)
+a
+
+(define x (list 'a 'b))
+(define y (list 'c 'd))
+(define z (append x y))
+z;(a b c d)
+(cdr x);(b)
+(define w (append! x y))
+w;(a b c d)
+(cdr x);(b c d)
+
+|#
+
+
+'(exercise 3 13)#|
+(define (last-pair x)
+  (if (null? (cdr x))
+      x
+      (last-pair (cdr x))))
+
+(define (make-cycle x)
+  (set-cdr! (last-pair x) x)
+  x)
+
+(define z (make-cycle (list 'a 'b 'c)))
+z;#0=(a b c . #0#)
+(last-pair x);(f)
+;; will run infinite loop
+|#
+
+'(exercise 3 14)#|
+(define (mystery x)
+  (define (loop x y)
+    (if (null? x)
+        y
+        (let ((temp (cdr x)))
+          (set-cdr! x y)
+          (loop temp x))))
+  (loop x '()))
+
+(define v '(a b c d))
+(define w (mystery v))
+w
+|#
+
+
+;; part shared among different data objects
+(define x (list 'a 'b))
+(define z1 (cons x x))
+
+#|
+z1;((a b) a b)
+(set-car! (car z1) 'wow)
+z1;((wow b) wow b)
+|#
+
+(define z2 (cons (list 'a 'b) (list 'a 'b)))
+
+#|
+z2;((a b) a b)
+(set-car! (car z2) 'wow)
+z2;((wow b) a b)
+|#
+
+(define (set-to-wow! x)
+  (set-car! (car x) 'wow)
+  x)
+
+
+'(exercise 3 15)
+;; you know :)
+
+'(exercise 3 16)
+(define (count-pairs x)
+  (if (not (pair? x))
+      0
+      (+ (count-pairs (car x))
+         (count-pairs (cdr x))
+         1)))
+
+(define three '(a b c))
+;(count-pairs three)
+
+(define four '(a b c))
+(set-car! four (cddr four))
+;(count-pairs four)
+
+(define level3 '(c))
+(define level2 (cons level3 level3))
+(define level1 (cons level2 level2))
+(define seven level1)
+;(count-pairs seven)
+
+(define infinite '(a b c))
+(set-cdr! (cddr infinite) infinite)
+;(count-pairs infinite)
+
+'(exercise 3 17)
+(define (count-pairs x)
+  (define visited '()) 
+  (define (counter x)
+    (if (or (not (pair? x))(memq x visited))
+        0
+        (begin 
+          (set! visited (cons x visited))
+          (+ (counter (car x))
+             (counter (cdr x))
+             1))))
+  (counter x))
+#|
+(count-pairs three);3
+(count-pairs four);3
+(count-pairs seven);3
+(count-pairs infinite);3
+|#
+
+'(exercise 3 18)
+(define (cycle? x)
+  (define visited '())
+  (define (iter current)
+    (set! visited (cons current visited))
+    (cond ((null? (cdr current)) #f)
+          ((memq (cdr current) visited) #t)
+          (else (iter (cdr current)))))
+  (iter x))
+
+#|
+(cycle? three);#f
+(cycle? four);#f
+(cycle? seven);#f
+(cycle? infinite);#t
+|#
+
+'(exercise 3 19)
+;; use a fast pointer and a slow pointer
+;; each iteration:
+;;     fast pointer cdr'ed twice
+;;     slow pointer cdr'ed once
+(define (cycle? lst)
+  (define (safe-cdr l)
+    (if (pair? l)
+        (cdr l)
+        '()))
+  (define (iter a b)
+    (cond ((not (pair? a)) #f)
+          ((not (pair? b)) #f)
+          ((eq? a b) #t)
+          ((eq? a (safe-cdr b)) #t)
+          (else (iter (safe-cdr a) (safe-cdr (safe-cdr b))))))
+  (iter (safe-cdr lst) (safe-cdr (safe-cdr lst))))
+
+#|
+(cycle? three);#f
+(cycle? four);#f
+(cycle? seven);#f
+(cycle? infinite);#t
+|#
+
+
+(define (cons! x y)
+  (define (set-x! v)(set! x v))
+  (define (set-y! v)(set! y v))
+  (define (dispatch m)
+    (cond ((eq? m 'car) x)
+          ((eq? m 'cdr) y)
+          ((eq? m 'set-car!) set-x!)
+          ((eq? m 'set-cdr!) set-y!)
+          (else "wrong")))
+  dispatch)
+
+(define (car! z) (z 'car))
+(define (cdr! z) (z 'cdr))
+(define (set-car!! z new)
+  ((z 'set-car!) new)
+  z)
+(define (set-cdr!! z new)
+  ((z 'set-cdr!) new)
+  z)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; (define x (cons 1 2))
+; (define z (cons x x))
+;
+;            +-------------------------------------------------+
+;            | cons    : ...                                   |
+;            | car     : ...            set-car!: ...          |
+;            | cdr     : ...            set-car!: ...          |
+; global --> |                                                 |
+; env        |    x <----------------------------------------------+-+
+;            |    |                      z                     |   | |
+;            +----|------------^---------|-------------^-------+   | |
+;                 |            |         |             |           | |
+;                 |       +----^----+    |        +----^----+      | |
+;                 V   E1=>|x:1      |    V    E1=>|x:x-------------+ |
+;              [*][*]     |y:2      |  [*][*]     |y:x---------------+
+;               |  |      |set-x! ..|   |  |      |set-x! ..|
+; params:m <----+  +----->|set-y! ..|   |  +----->|set-y! ..|
+; body:                   |dispatch |   |         |dispatch |     
+;   dispatch              +---------+  dispatch   +---------+
+;                                 
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; (set-car! (cdr z) 17)
+;
+;            +-------------------------------------------------+
+;            | cons    : ...                                   |
+;            | car     : ...            set-car!: ...          |<----+
+;            | cdr     : ...            set-car!: ...          |     |
+; global --> |                                                 |     |
+; env        |    x <--------------------------------------------+-+ |
+;            |    |                      z                     | | | |
+;            +----|------------^---------|-------------^-------+ | | |
+;                 |            |         |             |         | | |
+;                 |       +----^----+    |        +----^----+    | | |
+;                 V   E1=>|x:1      |    V    E2=>|x:x-----------+ | |
+;              [*][*]     |y:2      |  [*][*]     |y:x-------------+ |
+;               |  |      |set-x! ..|   |  |      |set-x! ..|        |
+; params:m <----+  +----->|set-y! ..|   |  +----->|set-y! ..|        |
+; body:                   |dispatch |   |         |dispatch |        |
+;   dispatch              +^-------^+  dispatch   +----^----+        |
+;                    E5    |     E6|                E3 |             |
+;                 +--------^--+ +--^--+           +----^----+        |
+;                 |m:'set-car!| |v:17 |           | m: 'cdr |        |
+;                 +-----------+ +-----+           +---------+        |
+;                 call dispatch call set-x       call dispatch       |
+;                                                                    |  
+;                                                 +---------+        |
+;                                             E4=>|z:x      |--------+
+;                                                 |new:17   |
+;                                                 +---------+
+;                                                call set-car!
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; (car z)
+;
+;            +-------------------------------------------------+
+;            | cons    : ...                                   |
+;            | car     : ...            set-car!: ...          |
+;            | cdr     : ...            set-car!: ...          |
+; global --> |                                                 |
+; env        |    x <----------------------------------------------+-+
+;            |    |                      z                     |   | |
+;            +----|------------^---------|-------------^-------+   | |
+;                 |            |         |             |           | |
+;                 |       +----^----+    |        +----^----+      | |
+;                 V   E1=>|x:17     |    V    E1=>|x:x-------------+ |
+;              [*][*]     |y:2      |  [*][*]     |y:x---------------+
+;               |  |      |set-x! ..|   |  |      |set-x! ..|
+; params:m <----+  +----->|set-y! ..|   |  +----->|set-y! ..|
+; body:                   |dispatch |   |         |dispatch |     
+;   dispatch              +----^----+ dispatch    +---------+
+;                              |   
+;                           +--^--+
+;                       E3=>|m:car|
+;                           +-----+
+;                          call dispatch
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; representing queues
+
+
+
+
+
+
+
+
+
+
+
+
+
 
