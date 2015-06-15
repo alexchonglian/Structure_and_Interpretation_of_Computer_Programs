@@ -1,3 +1,4 @@
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Chapter 3
 ;; Modularity, Object and State
@@ -12,8 +13,9 @@
 
 (define (withdraw amount)
   (if (>= balance amount)
-      (begin (set! balance (- balance amount))  balance)
+      (begin (set! balance (- balance amount)) balance)
       "Insufficent funds"))
+
 
 #|
 (withdraw 25);75
@@ -616,6 +618,20 @@
                   balance)
            "Insufficient funds")))
    initial-amount))
+
+#|
+(define (make-withdraw initial-amount)
+  (let ((balance initial-amount))
+    (lambda (amount)
+      (if (>= balance amount)
+          (begin (set! balance (- balance amount)) (list balance initial-amount))
+          "Insu"))))
+
+(define W1 (make-withdraw 100))
+(W1 10)
+(W1 50)
+(W1 30)
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1270,61 +1286,163 @@ z2;((wow b) a b)
     dispatch))
 |#
 
-'(exercise 3 23)
-;; incomplete
-(define (make-deque)
-  (let ((front-ptr '())
-        (rear-ptr '()))
-    (define (set-front-ptr! item)
-      (set! front-ptr item))
-    (define (set-rear-ptr! item)
-      (set! rear-ptr item))
-    (define (empty-queue?)
-      (null? front-ptr))
-    (define (front-queue)
-      (if (empty-queue?)
-          "empty already"
-          (car front-ptr)))
-    (define (rear-queue)
-      (if (empty-queue?)
-          "empty already"
-          (car rear-ptr)))
-    (define (insert-queue-front! item)
-      (let ((new-pair (cons item '())))
-        (cond ((empty-queue?)
-               (set-front-ptr! new-pair)
-               (set-rear-ptr! new-pair))
-              (else
-               (set-cdr! rear-ptr new-pair)
-               (set-rear-ptr! new-pair)))))
-    (define (insert-queue-rear! item)
-      (let ((new-pair (cons item '())))
-        (cond ((empty-queue?)
-               (set-front-ptr! new-pair)
-               (set-rear-ptr! new-pair))
-              (else
-               (set-cdr! rear-ptr new-pair)
-               (set-rear-ptr! new-pair)))))
-    (define (delete-queue-front!)
-      (cond ((empty-queue?)
-             "empty already")
-            (else (set-front-ptr! (cdr front-ptr)))))
-    (define (delete-queue-rear!)
-      (cond ((empty-queue?)
-             "empty already")
-            (else (set-rear-ptr! (cdr rear-ptr)))))
-    (define (print-queue) front-ptr)
-    (define (dispatch m)
-      (cond ((eq? m 'empty-queue) emtpy-queue?)
-            ((eq? m 'front-queue) front-queue)
-            ((eq? m 'rear-queue) rear-queue)
-            ((eq? m 'insert-queue-front!) insert-queue-front!)
-            ((eq? m 'insert-queue-rear!) insert-queue-rear!)
-            ((eq? m 'delete-queue-front!) delete-queue-front!)
-            ((eq? m 'delete-queue-rear!) delete-queue-rear!)
-            ((eq? m 'print-queue) print-queue)
-            (else "wrong message")))
-    dispatch))
+'(exercise 3 23)#|
+; use 2 lists as 1 data block
+; first = (cons data second)
+; second = (cons prev next)
+;
+;         --------   --------   --------
+;        /        \ /        \ /        \ /
+;       /          X          X          X
+;      /          / \        / \        / \  
+;     V          V  |       V  |       V  |  
+; => [**|**] => [**|**] => [**|**] => [**|**] => 
+;     |          |          |          |        
+;     V          V          V          V      
+;     (D1)       (D1)       (D1)       (D1)
+
+;wqzhang
+(define (front-ptr deque) (car deque))
+(define (rear-ptr deque) (cdr deque))
+(define (set-front-ptr! deque item) (set-car! deque item))
+(define (set-rear-ptr! deque item) (set-cdr! deque item))
+(define (make-deque) (cons '() '()))
+(define (empty-deque? deque) 
+  (and (null? (front-ptr deque))
+       (null? (rear-ptr deque))))
+(define (print-deque deque)
+  (define (collect q)
+    (if (null? q)
+        '()
+        (cons (car q) (collect (cddr q)))))
+  (display (collect (front-ptr deque)))
+  (newline))
+(define (rear-insert-deque! deque item)
+  (let ((new-pair (cons item (cons '() '()))))
+    (cond ((empty-deque? deque)
+           (set-front-ptr! deque new-pair)
+           (set-rear-ptr! deque new-pair))
+          (else
+           (set-car! (cdr new-pair) (rear-ptr deque))
+           (set-cdr! (cdr (rear-ptr deque)) new-pair)
+           (set-rear-ptr! deque new-pair)))))
+(define (front-insert-deque! deque item)
+  (let ((new-pair (cons item (cons '() '()))))
+    (cond ((empty-deque? deque)
+           (set-front-ptr! deque new-pair)
+           (set-rear-ptr! deque new-pair))
+          (else
+           (set-cdr! (cdr new-pair) (front-ptr deque))
+           (set-car! (cdr (front-ptr deque)) new-pair)
+           (set-front-ptr! deque new-pair)))))
+(define (front-deque deque)
+  (if (empty-deque? deque)
+      (display "error")
+      (car (front-ptr deque))))
+(define (rear-deque deque)
+  (if (empty-deque? deque)
+      (display "error")
+      (car (rear-ptr deque))))
+(define (front-delete-deque! deque)
+  (cond ((empty-deque? deque)
+         (display "error"))
+        ((eq? (front-ptr deque) (rear-ptr deque))
+         (set-front-ptr! deque '())
+         (set-rear-ptr! deque '()))
+        (else
+         (set-front-ptr! deque (cddr (front-ptr deque)))
+         (set-car! (cdr (front-ptr deque)) '()))))
+(define (rear-delete-deque! deque)
+  (cond ((empty-deque? deque)
+         (display "error"))
+        ((eq? (front-ptr deque) (rear-ptr deque))
+         (set-front-ptr! deque '())
+         (set-rear-ptr! deque '()))
+        (else
+         (set-rear-ptr! deque (cadr (rear-ptr deque)))
+         (set-cdr! (cdr (rear-ptr deque)) '()))))
+
+
+(define q1 (make-deque))
+(front-insert-deque! q1 'a)
+(print-deque q1)
+; (a)
+(front-insert-deque! q1 'b)
+(print-deque q1)
+; (b a)
+(rear-insert-deque! q1 'x)
+(print-deque q1)
+; (b a x)
+(rear-insert-deque! q1 'y)
+(print-deque q1)
+; (b a x y)
+(rear-delete-deque! q1)
+(print-deque q1)
+; (b a x)
+(front-delete-deque! q1)
+(print-deque q1)
+; (a x)
+(front-delete-deque! q1)
+(print-deque q1)
+; (x)
+(front-delete-deque! q1)
+(print-deque q1)
+; ()
+(empty-deque? q1)
+;Value: #t
+
+(define q2 (make-deque))
+(rear-insert-deque! q2 1)
+(print-deque q2)
+; (1)
+(front-insert-deque! q2 3)
+(print-deque q2)
+; (3 1)
+(front-insert-deque! q2 5)
+(print-deque q2)
+; (5 3 1)
+(front-deque q2)
+;Value: 5
+(rear-deque q2)
+;Value: 1
+(front-delete-deque! q2)
+(print-deque q2)
+; (3 1)
+(front-deque q2)
+;Value: 3
+(rear-deque q2)
+;Value: 1
+(rear-delete-deque! q2)
+(print-deque q2)
+; (3)
+(front-deque q2)
+;Value: 3
+(rear-deque q2)
+;Value: 3
+(empty-deque? q2)
+;Value: #f
+(rear-delete-deque! q2)
+(print-deque q2)
+; ()
+(empty-deque? q2)
+;Value: #t
+
+
+;
+; another implementation
+;
+; => [*][*] => [*][*] => [*][*] => [*][*] => [*][/]
+;     |         |         |         |         |
+;     V         V         V         V         V
+;     (D1)      (D1)      (D1)      (D1)      (D1)
+;        ^         ^         ^         ^         ^
+;        |         |         |         |         |
+;    [/][*] <= [/][*] <= [/][*] <= [/][*] <= [/][*] <= 
+;
+; NO that doesn't work :(
+
+|#
+
 
 (define t1 '(*table* (a . 1) (b . 2) (c . 3)));
 ;t1
@@ -2038,87 +2156,649 @@ or it will be in equilibrium (all zeros)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+
+
+
+
+
+
+
 ;(has-value? <connector>)
 ;(get-value  <connector>)
 ;(set-value! <connector> <new-value> <informant>)
 ;(forget-value! <connector> <retractor>)
 ;(connect <connector> <new-constraint>)
 
+
+
+
+(define (for-each-except exception proc list)
+  (define (loop items)
+    (cond ((null? items) 'done)
+          ((eq? (car items) exception) (loop (cdr items)))
+          (else (proc (car items))
+                (loop (cdr items)))))
+  (loop list))
+
+
+(define (make-connector)
+  (let ((value #f)
+        (informant #f)
+        (constraints '()))
+    (define (set-my-value newval setter)
+      (cond
+        ((not (has-value? me))
+         (set! value newval)
+         (set! informant setter)
+         (for-each-except setter
+                          inform-about-value
+                          constraints))
+        ((not (= value newval))
+         (display "contradiction"))
+        (else 'ignored)))
+    (define (forget-my-value retractor)
+      (if (eq? retractor informant)
+          (begin (set! informant #f)
+                 (for-each-except retractor
+                                  inform-about-no-value
+                                  constraints))
+          'ignored))
+    (define (connect new-constraint)
+      (if (not (memq new-constraint constraints))
+          (set! constraints
+                (cons new-constraint constraints)))
+      (if (has-value? me)
+          (inform-about-value new-constraint))
+      'done)
+    (define (me request)
+      (cond
+        ((eq? request 'has-value?) (if informant #t #f))
+        ((eq? request 'value) value)
+        ((eq? request 'set-value!) set-my-value)
+        ((eq? request 'forget) forget-my-value)
+        ((eq? request 'connect) connect)
+        (else (display "unknown operation"))))
+    me))
+
+
+(define (has-value? connector) (connector 'has-value?))
+
+(define (get-value connector) (connector 'value))
+
+(define (set-value! connector new-value informant)
+  ((connector 'set-value!) new-value informant))
+
+(define (forget-value! connector retractor)
+  ((connector 'forget) retractor))
+
+(define (connect connector new-constraint)
+  ((connector 'connect) new-constraint))
+
+
 (define (adder a1 a2 sum)
   (define (process-new-value)
-    (cond ((and (has-value? a1) (has-value? a2))
-           (set-value! sum
-                       (+ (get-value a1) (get-value a2))
-                       me))
-          ((and (has-value? a1) (has-value? sum))
-           (set-value! a2
-                       (- (get-value sum) (get-value a1))
-                       me))
-          ((and (has-value? a2) (has-value? sum))
-           (set-value! a1
-                       (- (get-value sum) (get-value a2))
-                       me))))
-  (define (process-forgot-value)
-    (forgot-value! sum me)
-    (forgot-value! a1 me)
-    (forgot-value! a2 me)
+    (cond
+      ((and (has-value? a1) (has-value? a2))
+       (set-value! sum
+                   (+ (get-value a1) (get-value a2))
+                   me))
+      ((and (has-value? a1) (has-value? sum))
+       (set-value! a2
+                   (- (get-value sum) (get-value a1))
+                   me))
+      ((and (has-value? a2) (has-value? sum))
+       (set-value! a2
+                   (- (get-value sum) (get-value a2))
+                   me))))
+  (define (process-forget-value)
+    (forget-value! sum me)
+    (forget-value! a1 me)
+    (forget-value! a2 me)
     (process-new-value))
   (define (me request)
-    (cond ((eq? request 'I-have-a-value) (process-new-value))
-          ((eq? request 'I-lost-my-value) (process-forgot-value))
-          (else (display "unknown"))))
+    (cond
+      ((eq? request 'I-have-a-value)
+       (process-new-value))
+      ((eq? request 'I-lost-my-value)
+       (process-forget-value))
+      (else
+       (display "unknown request"))))
   (connect a1 me)
   (connect a2 me)
   (connect sum me)
   me)
 
 
+(define (multiplier m1 m2 product)
+  (define (process-new-value)
+    (cond
+      ((or (and (has-value? m1) (= (get-value m1) 0))
+           (and (has-value? m2) (= (get-value m2) 0)))
+       (set-value! product 0 me))
+      ((and (has-value? m1) (has-value? m2))
+       (set-value! product
+                   (* (get-value m1) (get-value m2))
+                   me))
+      ((and (has-value? product) (has-value? m1))
+       (set-value! m2
+                   (/ (get-value product)
+                      (get-value m1))
+                   me))
+      ((and (has-value? product) (has-value? m2))
+       (set-value! m1
+                   (/ (get-value product)
+                      (get-value m2))
+                   me))))
+  (define (process-forget-value)
+    (forget-value! product me)
+    (forget-value! m1 me)
+    (forget-value! m2 me)
+    (process-new-value))
+  (define (me request)
+    (cond
+      ((eq? request 'I-have-a-value)
+       (process-new-value))
+      ((eq? request 'I-lost-my-value)
+       (process-forget-value))
+      (else
+       (display "unknown request"))))
+  (connect m1 me)
+  (connect m2 me)
+  (connect product me)
+  me)
 
-(define C (make-connector))
-(define F (make-connector))
-(celsius-fahrenheit-converter C F)
+
+(define (constant value connector)
+  (define (me request)
+    (display "unknown request"))
+  (connect connector me)
+  (set-value! connector value me)
+  me)
+
+
+(define (probe name connector)
+  (define (print-probe value)
+    (newline)
+    (display "Probe: ")
+    (display name)
+    (display " = ")
+    (display value)
+    (newline))
+  (define (process-new-value)
+    (print-probe (get-value connector)))
+  (define (process-forget-value)
+    (print-probe "?"))
+  (define (me request)
+    (cond
+      ((eq? request 'I-have-a-value)
+       (process-new-value))
+      ((eq? request 'I-lost-my-value)
+       (process-forget-value))
+      (else
+       (display "unknown request"))))
+  (connect connector me)
+  me)
+
+
+(define (inform-about-value constraint)
+  (constraint 'I-have-a-value))
+
+(define (inform-about-no-value constraint)
+  (constraint 'I-lost-my-value))
+
 
 (define (celsius-fahrenheit-converter c f)
   (let ((u (make-connector))
         (v (make-connector))
+        (w (make-connector))
         (x (make-connector))
-        (y (make-connector))
-        (z (make-connector)))
+        (y (make-connector)))
     (multiplier c w u)
     (multiplier v x u)
     (adder v y f)
     (constant 9 w)
     (constant 5 x)
     (constant 32 y)
-    (display "ok")))
+    'ok))
 
 
-(proble "Celsius temp" C)
-(proble "Fahrenheit temp" F)
+(define C (make-connector))
+(define F (make-connector))
 
-(set-value! C 25 'user)
+;(celsius-fahrenheit-converter C F)
+
+;(probe "Celsius temp" C)
+;(probe "Fahrenheit temp" F)
+
+
+;; testing
+
+;(set-value! C 25 'user)
 ;Probe: Celsius temp = 25
 ;Probe: Fahrenheit temp = 77
 ;done
 
-(set-value! F 212 'user)
+;(set-value! F 212 'user)
 ;Error! Contradiction (77 212)
 
-(forget-value! C 'user)
+;(forget-value! C 'user)
 ;Probe: Celcius temp = ?
 ;Probe: Fahrenheit temp = ?
 ;done
 
-(set-value! F 212 'user)
+;(set-value! F 212 'user)
 ;Probe: Celcius temp = 212
 ;Probe: Fahrenheit temp = 100
 ;done
 
 
+'(exercise 3 33)
+
+;; reuse adder and multiplier
+(define (averager a b c)
+  (let ((u (make-connector))
+        (v (make-connector)))
+    (adder a b u)
+    (multiplier c v u)
+    (constant 2 v)
+    'ok))
+
+;; create new one
+(define (averager a b c)
+  (define (process-new-value)
+    (cond
+      ((and (has-value? a) (has-value? b))
+       (set-value! c
+                   (+ (get-value a) (get-value b))
+                   me))
+      ((and (has-value? a) (has-value? c))
+       (set-value! b
+                   (- (* 2 (get-value c)) (get-value a))
+                   me))
+      ((and (has-value? a2) (has-value? sum))
+       (set-value! a
+                   (- (* 2 (get-value c)) (get-value b))
+                   me))))
+  (define (process-forget-value)
+    (forget-value! c me)
+    (forget-value! b me)
+    (forget-value! a me)
+    (process-new-value))
+  (define (me request)
+    (cond
+      ((eq? request 'I-have-a-value)
+       (process-new-value))
+      ((eq? request 'I-lost-my-value)
+       (process-forget-value))
+      (else
+       (display "unknown request"))))
+  (connect a me)
+  (connect b me)
+  (connect c me)
+  me)
+
+
+'(exercise 3 34)
+; the square constraint is unaware that a & a are identical
+; if set b to 4
+; nothing happens
+
+
+'(exercise 3 35)
+
+(define (squarer a b)
+  (define (process-new-value)
+    (if (has-value? b)
+        (if (< (get-value b) 0)
+            (error "square less than 0 - SQUARER"
+                   (get-value b))
+            (set-value! a
+                        (sqrt (get-value b))
+                        me))
+        (if (has-value? a)
+            (set-value! b
+                        (square (get-value a))
+                        me))))
+  (define (process-forget-value)
+    (forget-value! a me)
+    (forget-value! b me))
+  (define (me request)
+    (cond
+      ((eq? request 'I-have-a-value)
+       (process-new-value))
+      ((eq? request 'I-lost-my-value)
+       (process-forget-value))
+      (else
+       (display "unknown request"))))
+  (connect a me)
+  (connect b me)
+  me)
 
 
 
+'(exercise 3 36)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;           +------------------------------------------------------------+
+;           | for-each-except: ...        inform-about-value:...         |
+; global--> | b:----------------------------+                            |
+; env       | a:--+                         |                            |
+;           +-----|-------------^-----------|-------------^-----------^--+
+;                 |             |           |             |           |
+;                 V     +-------^-------+   V     +-------^-------+   |
+;              [*][*]   |value:10       | [*][*]  |init:100       |   |
+;               |  |    |informant:'user|  |  |   |informant:false|   |
+;               |  |    |cstrnts:'()    |  |  |   |cstrnts:'()    |   |
+;               |  |    |set-my-val:... |  |  |   |set-my-val:... |   |
+;               |  |    |               |  |  |   |               |   |
+;               |  |    +--^----^-------+  |  |   +-------^-------+   |
+;               |  |       |    |          |  |           |           |
+;               |  +-------+    |          |  +-----------+           |
+;               V               |          V                          |
+;  params:request               |       params:request   +------------^--+
+;  body:body of me     +--------^---+   body:body of me  |connector: a   |
+;                      |newval:10   |                    |new-value:10   |
+;                      |setter:'user|                    |informant:'user|
+;                      +--------^---+                    +---------------+
+;                               |call to set-my-value   call to set-value!
+;                               | 
+;                  +------------^---+
+;                  |exception:setter|                                 
+;                  |proc:ifm-abt-val|   
+;                  |list:constraints|
+;                  +----------------+
+;                 call to for-each-except
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+'(exercise 3 37)
+
+(define (celsius-fahrenheit-converter x)
+  (c+ (c* (c/ (cv 9) (cv 5))
+          x)
+      (cv 32)))
+
+(define (c+ x y)
+  (let ((z (make-connector)))
+    (adder x y z)
+    z))
+
+(define (c- x y)
+  (let ((z (make-connector)))
+    (adder z y x)
+    z))
+
+(define (c* x y)
+  (let ((z (make-connector)))
+    (multiplier x y z)
+    z))
+
+(define (c/ x y)
+  (let ((z (make-connector)))
+    (multiplier z y x)
+    z))
+
+(define (cv x)
+  (let ((z (make-connector)))
+    (constant x z)
+    z))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 3.4 Concurrency: Time Is of the Essence
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+'(exercise 3 38)
+
+; Peter +10
+; Paul  -20
+; Mary  -1/2
+
+;(a)
+; Peter Paul  Mary  45
+; Paul  Peter Mary  45
+; Peter Mary  Paul  35
+; Paul  Mary  Peter 50
+; Mary  Peter Paul  40
+; Mary  Paul  Peter 40
+
+;(b)
+; $30 $55 $60 $80 $90 $110
+
+; $30
+; Peter R 100  Mary  R 100
+; Peter W 110
+; Mary  W 50
+; Paul  R 50
+; Paul  W 30
+
+; $55
+; Peter R 100
+; Peter W 110
+; Mary  R 110  Paul  R 110
+; Paul  W 90
+; Mary  W 55
+
+; $60
+; Mary  R 100
+; Mary  W 50
+; Peter R 50   Paul  R 50
+; Paul  W 30
+; Peter W 60
+
+; $80
+; Peter R 100  Mary  R 100  Paul  R 100
+; Peter W 110
+; Paul  W 50
+; Mary  W 80
+
+; $90
+; Peter R 100
+; Peter W 110
+; Mary  R 110  Paul  R 110
+; Mary  W 55
+; Paul  W 90
+
+; $110
+; Peter R 100  Mary  R 100  Paul  R 100
+; Paul  W 50
+; Mary  W 80
+; Peter W 110
+
+
+(define x 10)
+
+(parallel-execute (lambda () (set! x (* x x)))
+                  (lambda () (set! x (+ x 1))))
+
+
+(define x 10)
+
+(define s (make-serializer))
+
+(parallel-execute (s (lambda () (set! x (* x x))))
+                  (s (lambda () (set! x (+ x 1)))))
+
+(define (make-account balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((protected (make-serializer)))
+    (define (dispatch m)
+      (cond ((eq? m 'withdraw) (protected withdraw))
+            ((eq? m 'deposit) (protected deposit))
+            ((eq? m 'balance) balance)
+            (else (display "unknown request"))))
+    dispatch))
+
+
+
+'(exercise 3 39)
+
+(define x 10)
+
+(define s (make-serializer))
+
+(parallel-execute
+ (lambda () (set! x ((s (lambda () (* x x))))))
+ (s (lambda () (set! x (+ x 1)))))
+
+; 100 is possible
+
+; P1 read x=10
+; P2 rw x=11
+; P1 write x=100;
+
+
+
+'(exercise 3 40)
+
+(define x 10)
+
+(parallel-execute (lambda () (set! x (* x x)))
+                  (lambda () (set! x (* x x x))))
+
+
+;1000000
+;P[1] sets x to 100 and then P[2] sets x to 1000000
+;P[2] sets x to 1000 and then P[1] sets x to 1000000
+
+;100000
+;P[2] accesses x once before P[1] set x to 100
+;    then P[2] accesses x twice, then P[2] sets x
+
+;10000
+;P[2] accesses x twice before P[1] set x to 100 
+;    then P[2] accesses x once, then P[2] sets x
+;P[2] sets x to 1000 between the two times that P[1]
+;    accesses x, then P[1] sets x.
+
+;1000
+;P[1] and P[2] access x two and three times respectively, 
+;    then P[1] sets x, then P[2] sets x
+
+;100
+;P[1] and P[2] access x two and three times respectively
+;    then P[2] sets x, then P[1] sets x
+
+
+'(exercise 3 41)
+
+(define (make-account balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((protected (make-serializer)))
+    (define (dispatch m)
+      (cond
+        ((eq? m 'withdraw) (protected withdraw))
+        ((eq? m 'deposit) (protected deposit))
+        ((eq? m 'balance) ((protected (lambda () balance))))
+        (else (display "unknown request"))))
+    dispatch))
+
+;; unnecesary move; reading balance is already atomic
+
+
+'(exercise 3 42)
+
+(define (make-account balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((protected (make-serializer)))
+    (let ((protected-withdraw (protected withdraw))
+          (protected-deposit (protected deposit)))
+      (define (dispatch m)
+        (cond
+          ((eq? m 'withdraw) protected-withdraw)
+          ((eq? m 'deposit) protected-deposit)
+          ((eq? m 'balance) balance)
+          (else (display "unknown request"))))
+      dispatch)))
+
+; no difference in terms of concurrency control
+; but the environment model is different
+; in that
+; for the old version (protected withdraw) is eval'ed every time its called
+; for the new version (protected withdraw) is eval'ed only once 
+
+
+(define (exchange account1 account2)
+  (let ((difference (- (account1 'balance) (account2 'balance))))
+    ((account1 'withdraw) difference)
+    ((account2 'deposit) difference)))
+
+
+(define (make-account-and-serializer balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((balance-serializer (make-serializer)))
+    (define (dispatch m)
+      (cond
+        ((eq? m 'withdraw) withdraw)
+        ((eq? m 'deposit) deposit)
+        ((eq? m 'balance) balance)
+        ((eq? m 'serializer) balance-serializer)
+        (else (display "unknown request"))))
+    dispatch))
+
+(define (deposit account amount)
+  (let ((s (account 'serializer))
+        (d (account 'deposit)))
+    ((s d) amount)))
+
+
+(define (serialized-exchange account1 account2)
+  (let ((serializer1 (account1 'serializer))
+        (serializer2 (account2 'serializer)))
+    ((serializer1 (serializer2 exchange))
+     account1
+     account2)))
+
+
+
+'(exercise 3 43)
+
+; because its exchange operation
+; imagine swapping these 3 accounts
+
+;; both can happen
+;; exchange a1 a2 first, then a1 a3
+; a1 a2 a3
+; 10 20 30
+; 20 10 30
+; 30 10 20
+
+;; exchange a1 a3 first, then a1 a2
+; a1 a2 a3
+; 10 20 30
+; 30 20 10
+; 20 30 10
 
 
 
