@@ -1173,6 +1173,13 @@ z2;((wow b) a b)
 
 ;; representing queues
 
+; API
+;(make-queue)
+;(empty-queue? <queue>)
+;(front-queue <queue>)
+;(insert-queue! <queue> <item>)
+;(delete-queue! <queue>)
+
 (define (front-ptr queue) (car queue))
 
 (define (rear-ptr queue) (cdr queue))
@@ -1250,6 +1257,7 @@ z2;((wow b) a b)
 
 
 '(exercise 3 22)#|
+;; proc \w local state
 (define (make-queue)
   (let ((front-ptr '())
         (rear-ptr '()))
@@ -1261,7 +1269,7 @@ z2;((wow b) a b)
       (null? front-ptr))
     (define (front-queue)
       (if (empty-queue?)
-          "empty already"
+          (display "empty already") ;; "error" VS. (display "error")
           (car front-ptr)))
     (define (insert-queue! item)
       (let ((new-pair (cons item '())))
@@ -1506,6 +1514,17 @@ z2;((wow b) a b)
         (set-cdr! table (cons (list key-1 (cons key-2 value))
                               (cdr table)))))
   'ok)
+#|
+(insert! 'math '+ 10 t2)
+t2
+(insert! 'letters 'a 79 t2)
+t2
+(insert! 'letters 'c 99 t2)
+t2
+(insert! 'symbol '& 'and t2)
+t2
+|#
+
 
 (define (make-table)
   (let ((local-table (list '*table*)))
@@ -1523,21 +1542,43 @@ z2;((wow b) a b)
             (let ((record (asso key-2 (cdr subtable))))
               (if record
                   (set-cdr! record value)
-                  (set-cdr! subtable (cons (cons key-2 value)
-                                           (cdr subtable)))))
-            (set-cdr! local-table (cons (list key-1 (cons key-2 value))
-                                        (cdr local-table)))))
+                  (set-cdr! subtable
+                            (cons (cons key-2 value)
+                                  (cdr subtable)))))
+            (set-cdr! local-table
+                      (cons (list key-1
+                                  (cons key-2 value))
+                            (cdr local-table)))))
       'ok)
+    (define (print-table)
+      local-table)
     (define (dispatch m)
       (cond ((eq? m 'lookup-proc) lookup)
-            ((eq? m 'insert-proc) insert!)
-            (else "wrong message")))
+            ((eq? m 'insert-proc!) insert!)
+            ((eq? m 'print-table) print-table); for debugging
+            (else (display "error"))))
     dispatch))
-
 
 (define operation-table (make-table))
 (define get (operation-table 'lookup-proc))
 (define put (operation-table 'insert-proc!))
+(define print-table (operation-table 'print-table))
+
+#|
+(put 'math '+ 43)
+(put 'math '- 45)
+(put 'math '* 42)
+(put 'letters 'a 97)
+(put 'letters 'b 98)
+(put 'letters 'c 99)
+(print-table)
+(get 'math '+)
+(get 'math '-)
+(get 'math '*)
+(get 'letters 'a)
+(get 'letters 'b)
+(get 'letters 'c)
+|#
 
 
 '(exercise 3 24)#|
@@ -1626,6 +1667,101 @@ z2;((wow b) a b)
 ((t1 'lookup) '(letters a));97
 |#
 
+;; finally came up \w a solution :)
+(define (make-table)
+  (let ((local-table (list '*table*)))
+
+    (define (asso key records)
+      (cond 
+        ((null? records) #f)
+        ((equal? key (caar records)) (car records))
+        (else (asso key (cdr records)))))
+
+    (define (lookup key-list)
+      (define (lookup-recur keys table)
+        (let ((subtable (asso (car keys) (cdr table))))
+          (if subtable
+              (if (null? (cdr keys))
+                  (cdr subtable)
+                  (lookup-recur (cdr keys) subtable))
+              #f)))
+      (lookup-recur key-list local-table))
+
+    (define (insert! key-list value)
+      (define (make-entry keys)
+        (if (null? (cdr keys))
+            (cons (car keys) value)
+            (list (car keys) (make-entry (cdr keys)))))
+      (define (insert-recur keys table)
+        (let ((subtable (asso (car keys) (cdr table))))
+          (cond ((eq? subtable #f)
+                 (set-cdr! table
+                           (cons (make-entry keys) (cdr table))))
+                ((not (list? (cdr subtable)))
+                 (set-cdr! subtable (cdr (make-entry keys))))
+                (else 
+                 (if (null? (cdr keys))
+                     (set-cdr! subtable value)
+                     (insert-recur (cdr keys) subtable))))))
+
+      (insert-recur key-list local-table)
+      'ok)
+
+    (define (print-table)
+      local-table)
+
+    (define (dispatch m)
+      (cond ((eq? m 'lookup-proc) lookup)
+            ((eq? m 'insert-proc!) insert!)
+            ((eq? m 'print-table) print-table)
+            (else (display "error"))))
+    dispatch))
+
+#|
+(define operation-table (make-table))
+(define get (operation-table 'lookup-proc))
+(define put (operation-table 'insert-proc!))
+(define print-table (operation-table 'print-table))
+
+
+(put '(letters lower a) 97)
+(print-table);(*table* (letters (lower (a . 97))))
+
+
+(put '(letters) 'letters);; overwrite 3D with 1D
+(print-table);(*table* (letters . letters))
+
+(put '(letters lower a) 97);; overwrite 1D with 3D
+(print-table);(*table* (letters (lower (a . 97))))
+
+
+(put '(letters) 'letters);; overwrite 3D with 1D
+(print-table);(*table* (letters . letters))
+
+(put '(letters lower a) 97);; overwrite 1D with 3D
+(print-table);(*table* (letters (lower (a . 97))))
+
+
+
+(get '(letters));((lower (a . 97)))
+(get '(letters lower));((a . 97))
+(get '(letters lower a));97
+
+(put '(letters lower a) 97)
+(put '(letters lower b) 98)
+(put '(letters lower c) 99)
+(put '(letters upper A) 63)
+(put '(letters upper B) 64)
+(put '(letters upper C) 65)
+(put '(math +) 43)
+(put '(math -) 45)
+(put '(math *) 42)
+(print-table)
+;(*table* (math (* . 42) (- . 45) (+ . 43))
+;         (letters (upper (c . 65) (b . 64) (a . 63))
+;                  (lower (c . 99) (b . 98) (a . 97))))
+|#
+
 
 
 '(exercise 3 26)#|
@@ -1699,11 +1835,11 @@ z2;((wow b) a b)
 (define (set-left! record new-left) (set-car! (cdr record) new-left))
 (define (set-right! record new-right) (set-car! (cddr record) new-right))
 
-(define (assoc key records)
+(define (asso key records)
   (cond ((null? records) false)
         ((equal? key (get-key records)) (get-value records))
-        ((< key (get-key records)) (assoc key (get-left records)))
-        (else (assoc key (get-right records)))))
+        ((< key (get-key records)) (asso key (get-left records)))
+        (else (asso key (get-right records)))))
   
 (define (add-record key value table)
   (define (iter record parent set-action)
@@ -1724,7 +1860,7 @@ z2;((wow b) a b)
     (define (lookup keys)
       (define (iter keys records)
         (if (null? keys) records
-            (let ((found (assoc (car keys) records)))
+            (let ((found (asso (car keys) records)))
               (if found (iter (cdr keys) found)
                   #f))))
       (iter keys (cdr local-table)))
@@ -2146,6 +2282,21 @@ or it will be in equilibrium (all zeros)
 
 '(exercise 3 32)
 ; obviously temperal order matters
+; use and-gate as example
+; (and-gate a1 a2 output)
+; changing from {a1=0, a2=1} to {a1=1, a2=0} 
+; changing two input a1 a2 simultaneously
+; the transition might be (1) {a1=0, a2=1} to {a1=1, a2=1} to {a1=1, a2=0}
+;                      or (2) {a1=0, a2=1} to {a1=0, a2=0} to {a1=1, a2=0}
+; depending on which wire (a1 a2) add-action-procedure first
+
+; in the first case (a1 add-action-procedures first)
+; {a1=0, a2=1} to {a1=1, a2=1} register callback1 that set output to 1
+; {a1=1, a2=1} to {a1=1, a2=0} register callback2 that set output to 0
+; execute callback1 first, then callback2, we got output 0, correct
+; execute callback2 first, then callback1, we got output 1, wrong
+; therefore order matters and we need queue (fifo buffer) to maintain them
+
 
 
 ;; 3.3.5 propagation of constraints
