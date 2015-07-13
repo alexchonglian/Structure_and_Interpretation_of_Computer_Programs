@@ -624,7 +624,8 @@
   (let ((balance initial-amount))
     (lambda (amount)
       (if (>= balance amount)
-          (begin (set! balance (- balance amount)) (list balance initial-amount))
+          (begin (set! balance (- balance amount)) 
+                 (list balance initial-amount))
           "Insu"))))
 
 (define W1 (make-withdraw 100))
@@ -2759,6 +2760,7 @@ or it will be in equilibrium (all zeros)
 ; Mary  W 80
 ; Peter W 110
 
+(define (parallel-execute . args) (for-each 1thread args))
 
 (define x 10)
 
@@ -2863,9 +2865,7 @@ or it will be in equilibrium (all zeros)
 
 ;; unnecesary move; reading balance is already atomic
 
-
-'(exercise 3 42)
-
+'(exercise 3 42)#|
 (define (make-account balance)
   (define (withdraw amount)
     (if (>= balance amount)
@@ -2886,11 +2886,16 @@ or it will be in equilibrium (all zeros)
           (else (display "unknown request"))))
       dispatch)))
 
+
 ; no difference in terms of concurrency control
 ; but the environment model is different
 ; in that
 ; for the old version (protected withdraw) is eval'ed every time its called
+;   so there are many copies of (protected withdraw) floating around
 ; for the new version (protected withdraw) is eval'ed only once 
+;   so there is only one copy of (protected withdraw)
+
+|#
 
 
 (define (exchange account1 account2)
@@ -2898,17 +2903,15 @@ or it will be in equilibrium (all zeros)
     ((account1 'withdraw) difference)
     ((account2 'deposit) difference)))
 
-
 (define (make-account-and-serializer balance)
   (define (withdraw amount)
     (if (>= balance amount)
-        (begin (set! balance (- balance amount))
-               balance)
-        "Insufficient funds"))
+        (begin (set! balance (- balance amount)))
+        (display "Insufficient funds")))
   (define (deposit amount)
     (set! balance (+ balance amount))
     balance)
-  (let ((balance-serializer (make-serializer)))
+  (let ((balance-serializer (maker-serializer)))
     (define (dispatch m)
       (cond
         ((eq? m 'withdraw) withdraw)
@@ -2952,8 +2955,45 @@ or it will be in equilibrium (all zeros)
 ; 20 30 10
 
 
+'(exercise 3 44)
+(define (transfer from-account to-account amount)
+  ((from-account 'withdraw) amount)
+  ((to-account 'deposit) amount))
+
+; Louis Reasoner is wrong. Ben's version will work.
+; exchange need to be exclusive(start exchange after prev exchange finishes)
+; transfer is not, because transfer commutative
+; receive 10 from A then receive 20 from B is equivalent to
+; receive 20 from B then receive 10 from A
+; start a transfer to account1 while it's in another transfer is totally ok
 
 
+'(exercise 3 45)
+(define (make-account-and-serializer balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((balance-serializer (make-serializer)))
+    (define (dispatch m)
+      (cond ((eq? m 'withdraw) (balance-serializer withdraw))
+            ((eq? m 'deposit) (balance-serializer deposit))
+            ((eq? m 'balance) balance)
+            ((eq? m 'serializer) balance-serializer)
+            (else (display "unknown request"))))
+    dispatch))
+
+(define (deposit account amount)
+  ((account 'deposit) amount))
+
+; serialized-change will call (account1 'withdraw) and (account2 'deposit)
+; locks of account1 and account2 re already acquired by serialized-exchange
+; when (account1 'withdraw) and (account2 'deposit) try to acquire them again
+; they will keep busy waiting and never stops
 
 
 
