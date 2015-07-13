@@ -2760,7 +2760,7 @@ or it will be in equilibrium (all zeros)
 ; Mary  W 80
 ; Peter W 110
 
-(define (parallel-execute . args) (for-each 1thread args))
+(define (parallel-execute . args) (for-each thread args))
 
 (define x 10)
 
@@ -2911,7 +2911,7 @@ or it will be in equilibrium (all zeros)
   (define (deposit amount)
     (set! balance (+ balance amount))
     balance)
-  (let ((balance-serializer (maker-serializer)))
+  (let ((balance-serializer (make-serializer)))
     (define (dispatch m)
       (cond
         ((eq? m 'withdraw) withdraw)
@@ -2993,8 +2993,169 @@ or it will be in equilibrium (all zeros)
 ; serialized-change will call (account1 'withdraw) and (account2 'deposit)
 ; locks of account1 and account2 re already acquired by serialized-exchange
 ; when (account1 'withdraw) and (account2 'deposit) try to acquire them again
-; they will keep busy waiting and never stops
+; they will keep busy waiting forever
 
+
+(define (make-serializer)
+  (let ((mutex (make-mutex)))
+    (lambda (p)
+      (define (serialized-p . args)
+        (mutex 'acquire)
+        (let ((val (apply p args)))
+          (mutex 'release)
+          val))
+      serialized-p)))
+
+(define (make-mutex)
+  (let ((cell (list #f)))
+    (define (the-mutex m)
+      (cond ((eq? m 'acquire) (if (test-and-set! cell)
+                                  (the-mutex 'acquire)))
+            ((eq? m 'release) (clear! cell))))
+    the-mutex))
+
+(define (clear! cell)
+  (set-car! cell #f))
+
+(define (test-and-set! cell)
+  (if (car cell)
+      #t
+      (begin (set-car! cell #t)
+             #f)))
+
+
+;; without-interrupts - disable time slicing
+;; atomic operator was provided in hardware level
+;; such as
+;; test-and-clear, swap, compare-and-exchange, load-reserve, store-conditional
+;; we can imple test-and-set! in MIT Scheme
+#|
+(define (test-and-set! cell)
+  (without-interrupts
+   (lambda ()
+     (if (car cell)
+         #t
+         (begin (set-car! cell #t)
+                #f)))))
+|#
+
+
+'(exercise 3 46)
+; 2 processes access cell in the same time
+; then both found it false
+; then both acquire it and set it to true and fail
+; therefore read cell and set cell not be interrupted (atomic)
+
+
+'(exercise 3 47)#|
+;; the general idea is to track number of processes with counter
+;; and guard that counter with mutex (or imple of mutex using test-and-set!)
+
+; 1. use mutex
+(define (make-semaphore n)
+  (let ((lock (make-mutex))
+        (count 0))
+    (define (dispatch m)
+      (cond ((eq? m 'acquire)
+             (lock 'acquire)
+             (if (= count n)
+                 (begin 
+                   (lock 'release) (dispatch 'acquire))
+                 (begin 
+                   (set! count (+ count 1)) (lock 'release))))
+            ((eq? m 'release)
+             (lock 'acquire)
+             (if (> count 0)
+                 (set! count (- count 1)))
+             (lock 'release))))
+    dispatch))
+
+
+; 2. use test-and-set!
+(define (make-semaphore n)
+  (let ((cell (list #f))
+        (count 0))
+    (define (test-and-set! cell)
+      (if (car cell)
+          #t
+          (begin (set-car! cell #t)
+                 #f)))
+    (define (release-lock)
+      (set-car! cell #f))
+    (define (acquire-lock)
+      (if (test-and-set! cell)
+          (acquire-lock)))
+    (define (dispatch m)
+      (cond ((eq? m 'acquire)
+             (acquire-lock)
+             (if (= count n)
+                 (begin
+                   (release-lock) (dispatch 'acquire))
+                 (begin
+                   (set! count (+ count 1)) (release-lock))))
+            ((eq? m 'release)
+             (acquire-lock)
+             (if (> count 0)
+                 (set! count (- count 1)))
+             (release-lock))))
+    dispatch))
+|#
+
+
+'(exercise 3 48)
+; in essence, deadlock is a loopy/circular structure of resource acquisition
+; imposing acquisition order (cascading structure) in resources 
+; will prevent loopy structure, thus prevent deadlocks
+
+(define (make-account-and-serializer balance id)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((balance-serializer (make-serializer)))
+    (define (dispatch m)
+      (cond ((eq? m 'withdraw) withdraw)
+            ((eq? m 'deposit) deposit)
+            ((eq? m 'balance) balance)
+            ((eq? m 'id) id)
+            ((eq? m 'serializer) balance-serializer)
+            (else (display "unknown request"))))
+    dispatch))
+
+(define (serialize-exchange account1 account2)
+  (let ((sr1 (account1 'serializer))
+        (sr2 (account2 'serializer))
+        (id1 (account1 'id))
+        (id2 (account2 'id)))
+    (if (< id1 id2)
+        ((s2 (s1 exchange)) account2 account1)
+        ((s1 (s2 exchange)) account1 account2))))
+
+
+'(exercise 3 49)
+; e.g. 
+; two processes A and B:
+; A acquire resource1, then found it need to acquire resource2
+; B acquire resource2, then found it need to acquire resource1
+; thus A holds resource1 and B holds resource2 and none of em back out
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 3.5 Streams
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+'(exercise 3 50)
+(define (stream-map proc . argstreams)
+  (if (null? (car argstreams))
+      the-empty-stream
+      (cons-stream
+       (apply proc (map stream-car argstreams))
+       (apply stream-map
+              (cons proc (map stream-cdr argstreams))))))
 
 
 
