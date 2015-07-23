@@ -2760,6 +2760,7 @@ or it will be in equilibrium (all zeros)
 ; Mary  W 80
 ; Peter W 110
 
+#|
 (define (parallel-execute . args) (for-each thread args))
 
 (define x 10)
@@ -2775,6 +2776,7 @@ or it will be in equilibrium (all zeros)
 (parallel-execute (s (lambda () (set! x (* x x))))
                   (s (lambda () (set! x (+ x 1)))))
 
+|#
 (define (make-account balance)
   (define (withdraw amount)
     (if (>= balance amount)
@@ -2794,7 +2796,7 @@ or it will be in equilibrium (all zeros)
 
 
 
-'(exercise 3 39)
+'(exercise 3 39)#|
 
 (define x 10)
 
@@ -2809,10 +2811,10 @@ or it will be in equilibrium (all zeros)
 ; P1 read x=10
 ; P2 rw x=11
 ; P1 write x=100;
+|#
 
 
-
-'(exercise 3 40)
+'(exercise 3 40)#|
 
 (define x 10)
 
@@ -2841,7 +2843,7 @@ or it will be in equilibrium (all zeros)
 ;100
 ;P[1] and P[2] access x two and three times respectively
 ;    then P[2] sets x, then P[1] sets x
-
+|#
 
 '(exercise 3 41)
 
@@ -3148,6 +3150,128 @@ or it will be in equilibrium (all zeros)
 ;; 3.5 Streams
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+(define (smallest-divisor n)
+  (find-divisor n 2))
+
+(define (find-divisor n test-divisor)
+  (cond ((> (square test-divisor) n) n)
+        ((divides? test-divisor n) test-divisor)
+        (else (find-divisor n (+ test-divisor 1)))))
+
+(define (square x) (* x x))
+
+(define (divides? a b)
+  (= (remainder b a) 0))
+
+(define (prime? n)
+  (= n (smallest-divisor n)))
+
+;(prime? 121)
+
+;; implement sum-primes in recursive style
+(define (sum-primes a b)
+  (define (iter count accum)
+    (cond ((> count b) accum)
+          ((prime? count) (iter (+ count 1) (+ count accum)))
+          (else (iter (+ count 1) accum))))
+  (iter a 0))
+
+;(sum-primes 3 12) ;3+5+7+11
+
+(define nil '())
+
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+      initial
+      (op (car sequence)
+          (accumulate op initial (cdr sequence)))))
+
+(define (filter predicate sequence)
+     (cond ((null? sequence) nil)
+           ((predicate (car sequence))
+            (cons (car sequence)
+                  (filter predicate (cdr sequence))))
+           (else (filter predicate (cdr sequence)))))
+
+(define (enumerate-interval low high)
+      (if (> low high)
+          nil
+          (cons low (enumerate-interval (+ low 1) high))))
+
+;; implement sum-primes using seq operation - map, filter, accumulate, etc.
+(define (sum-primes a b)
+  (accumulate +
+              0
+              (filter prime? (enumerate-interval a b))))
+
+;(sum-primes 3 12)
+
+
+; extremely slow
+;(car (cdr (filter prime? (enumerate-interval 10000 1000000))))
+
+(define (force delayed-object)
+  (delayed-object))
+
+(define (stream-car stream) (car stream))
+
+(define (stream-cdr stream) (force (cdr stream)))
+
+(define (stream-enumerate-interval low high)
+  (if (> low high)
+      the-empty-stream
+      (cond-stream low (stream-enumerate-interval (+ low 1) high))))
+
+(define (stream-filter pred stream)
+  (cond ((stream-null? stream) the-empty-stream)
+        ((pred (stream-car stream))
+         (cons-stream (stream-car stream)
+                      (stream-filter pred
+                                     (stream-cdr stream))))
+        (else (stream-filter pred (stream-cdr stream)))))
+
+
+(define (stream-ref s n)
+  (if (= n 0)
+      (stream-car s)
+      (stream-ref (stream-cdr s) (- n 1))))
+
+(define (stream-map proc s)
+  (if (stream-null? s)
+      the-empty-stream
+      (cons-stream (proc (stream-car s))
+                   (stream-map proc (stream-cdr s)))))
+
+(define (stream-for-each proc s)
+  (if (stream-null? s)
+      'done
+      (begin (proc (stream-car s))
+             (stream-for-each proc (stream-cdr s)))))
+
+(define (display-stream s)
+  (stream-for-each display-line s))
+
+(define (display-line x)
+  (newline)
+  (display x))
+
+;(cons-stream <a> <b>) is equivalent to (cons <a> (delay <b>))
+
+
+
+(cons 10000 (delay (stream-enumerate-interval 10001 1000000)))
+(cons 10001 (delay (stream-enumerate-interval 10002 1000000)))
+
+
+(stream-car (stream-cdr 
+             (stream-filter prime? (stream-enumerate-interval 10000 1000000)))
+
+(stream-car (cons-stream 'x 'y));x
+(stream-cdr (cons-stream 'x 'y));y
+
+
+
 '(exercise 3 50)
 (define (stream-map proc . argstreams)
   (if (null? (car argstreams))
@@ -3156,8 +3280,6 @@ or it will be in equilibrium (all zeros)
        (apply proc (map stream-car argstreams))
        (apply stream-map
               (cons proc (map stream-cdr argstreams))))))
-
-
 
 
 
