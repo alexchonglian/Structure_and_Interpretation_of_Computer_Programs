@@ -3289,3 +3289,6 @@ or it will be in equilibrium (all zeros)
 
 
 
+
+
+
