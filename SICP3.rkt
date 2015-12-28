@@ -3150,7 +3150,6 @@ or it will be in equilibrium (all zeros)
 ;; 3.5 Streams
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (define (smallest-divisor n)
   (find-divisor n 2))
 
@@ -3211,26 +3210,29 @@ or it will be in equilibrium (all zeros)
 ; extremely slow
 ;(car (cdr (filter prime? (enumerate-interval 10000 1000000))))
 
-(define (force delayed-object)
+;(eq? (stream-car (cons-stream x y)) x)
+;(eq? (stream-cdr (cons-stream x y)) y)
+
+(define (force! delayed-object)
   (delayed-object))
+
+(define (memo-proc proc)
+  (let ((already-run? #f)
+        (result #f))
+    (lambda ()
+      (if (not already-run?)
+          (begin (set! result (proc))
+                 (set! already-run? true)
+                 result)
+          result))))
 
 (define (stream-car stream) (car stream))
 
-(define (stream-cdr stream) (force (cdr stream)))
+(define (stream-cdr stream) (force! (cdr stream)))
 
-(define (stream-enumerate-interval low high)
-  (if (> low high)
-      the-empty-stream
-      (cond-stream low (stream-enumerate-interval (+ low 1) high))))
+(define the-empty-stream '())
 
-(define (stream-filter pred stream)
-  (cond ((stream-null? stream) the-empty-stream)
-        ((pred (stream-car stream))
-         (cons-stream (stream-car stream)
-                      (stream-filter pred
-                                     (stream-cdr stream))))
-        (else (stream-filter pred (stream-cdr stream)))))
-
+(define stream-null? null?)
 
 (define (stream-ref s n)
   (if (= n 0)
@@ -3249,6 +3251,18 @@ or it will be in equilibrium (all zeros)
       (begin (proc (stream-car s))
              (stream-for-each proc (stream-cdr s)))))
 
+(define (stream-enumerate-interval low high)
+  (if (> low high)
+      the-empty-stream
+      (cons-stream low (stream-enumerate-interval (+ low 1) high))))
+
+(define (stream-filter pred stream)
+  (cond ((stream-null? stream) the-empty-stream)
+        ((pred (stream-car stream))
+         (cons-stream (stream-car stream)
+                      (stream-filter pred (stream-cdr stream))))
+        (else (stream-filter pred (stream-cdr stream)))))
+
 (define (display-stream s)
   (stream-for-each display-line s))
 
@@ -3258,14 +3272,14 @@ or it will be in equilibrium (all zeros)
 
 ;(cons-stream <a> <b>) is equivalent to (cons <a> (delay <b>))
 
-
-
-(cons 10000 (delay (stream-enumerate-interval 10001 1000000)))
-(cons 10001 (delay (stream-enumerate-interval 10002 1000000)))
+;(cons 10000 (delay (stream-enumerate-interval 10001 1000000)))
+;(cons 10001 (delay (stream-enumerate-interval 10002 1000000)))
 
 
 (stream-car (stream-cdr 
-             (stream-filter prime? (stream-enumerate-interval 10000 1000000)))
+             (stream-filter
+              prime?
+              (stream-enumerate-interval 10000 1000000))))
 
 (stream-car (cons-stream 'x 'y));x
 (stream-cdr (cons-stream 'x 'y));y
@@ -3274,16 +3288,180 @@ or it will be in equilibrium (all zeros)
 
 '(exercise 3 50)
 (define (stream-map proc . argstreams)
-  (if (null? (car argstreams))
+  (if (stream-null? (car argstreams))
       the-empty-stream
-      (cons-stream
-       (apply proc (map stream-car argstreams))
-       (apply stream-map
-              (cons proc (map stream-cdr argstreams))))))
+      (cons-stream (apply proc (map stream-car argstreams))
+                   (apply stream-map
+                          (cons proc (map stream-cdr argstreams))))))
+
+'(exercise 3 51)
+(define (show x)
+  (display-line x)
+  x)
+
+(define x (stream-map show (stream-enumerate-interval 0 10)))
+
+(stream-ref x 5)
+;1
+;2
+;3
+;4
+;5
+
+(stream-ref x 7)
+;6
+;7
+
+'(exercise 3 52)#|
+(define sum 0)
+
+(define (accum x)
+  (set! sum (+ x sum))
+  sum)
+
+(define seq
+  (stream-map accum (stream-enumerate-interval 1 20)))
+;sum = 1
+(define y (stream-filter even? seq))
+;sum = 6
+(define z (stream-filter (lambda (x) (= (remainder x 5) 0)) seq))
+;sum = 10
+(stream-ref y 7)
+
+(display-stream z)
+|#
 
 
+(define (integer-starting-from n)
+  (cons-stream n (integer-starting-from (+ n 1))))
+
+(define integers (integers-starting-from 1))
+
+(define (divisible? x y) (= (remainder x y) 0))
+
+(define no-sevens
+  (stream-filter (lambda (x) (not (divisible? x 7)))
+                 integers))
+
+(stream-ref no-sevens 100)
+;117
+
+(define (fibgen a b)
+  (cons-stream a (fibgen b (+ a b))))
+
+(define (fibs (fibgen 0 1)))
+
+(define (sieve stream)
+  (cons-stream (stream-car stream)
+               (sieve (stream-filter
+                       (lambda (x)
+                         (not (divisible? x (stream-car stream))))
+                       (stream-cdr stream)))))
+
+(define ones (cons-stream 1 ones))
+
+(define (add-streams s1 s2) (stream-map + s1 s2))
+
+(define (mul-streams s1 s2) (stream-map * s1 s2))
+
+;(define integers (cons-stream 1 (add-streams ones integers)))
+
+;(define fibs (cons-stream 0 (cons-stream 1 (add-streams (stream-cdr fibs) fibs))))
+
+; fibs is a stream beginning with 0 and 1, st the rest of the stream
+; can be generated by adding fibs to itself shifted by one place
+
+(define (scale-stream stream factor)
+  (stream-map (lambda (x) (* x factor)) stream))
+
+(define double (cons-stream 1 (scale-stream double 2)))
+
+(define primes (cons-stream 2 (stream-filter prime? (integer-starting-from 3))))
+
+(define (prime? n)
+  (define (iter ps)
+    (cond
+      ((> (square (stream-car ps)) n) #t)
+      ((divisible? n (stream-car ps)) #f)
+      (else (iter (stream-cdr ps)))))
+  (iter (primes)))
 
 
+'(exercise 3 53)
+(define s (cons-stream 1 (add-streams s s)))
+;power series 1 2 4 8 16 32 ...
+
+'(exercise 3 54)
+(define factorials
+  (cons-stream 1 (mul-streams (integers-starting-from 2) factorials)))
+
+'(exercise 3 55)
+(define (partial-sums s)
+  (cons-stream (stream-car s)
+               (add-streams (stream-cdr s) (partial-sums s))))
+
+'(exercise 3 56)
+(define (merge s1 s2)
+  (cond
+    ((stream-null? s1) s2)
+    ((stream-null? s2) s1)
+    (else
+     (let ((s1car (stream-car s1))
+           (s2car (stream-car s2)))
+       (cond ((< s1car s2car)
+              (cons-stream
+               s1car
+               (merge (stream-cdr s1) s2)))
+             ((> s1car s2car)
+              (cons-stream
+               s2car
+               (merge s1 (stream-cdr s2))))
+             (else
+              (cons-stream
+               s1car
+               (merge (stream-cdr s1) (stream-cdr s2)))))))))
+
+(define S (cons-stream 1 (merge (merge (scale-stream S 2) (scale-stream S 3))
+                                (scale-stream S 5))))
+
+'(exercise 3 57)
+; without memoization optimization, C(n) = C(n-1) + C(n-2) + 1, thus exponential growth
+
+'(exercise 3 58)
+(define (expand num den radix)
+  (cons-stream (quotient (* num radix) den)
+               (expand (remainder (* num radix) den) den radix)))
+
+;(expand 1 7 10)
+;(1 (expand 3 7 10))
+;(1 4 (expand 2 7 10))
+;(1 4 2 (expand 6 7 10))
+;(1 4 2 8 (expand 4 7 10))
+;(1 4 2 8 5 (expand 5 7 10))
+;(1 4 2 8 5 7 (expand 1 7 10))
+;(1 4 2 8 5 7 1 (expand 3 7 10))
+;(1 4 2 8 5 7 1 4 (expand 2 7 10))
+
+;(expand 3 8 10)
+;(3 (expand 6 8 10)
+;(3 7 (expand 4 8 10)
+;(3 7 5 (expand 0 8 10)
+;(3 7 5 0 (expand 0 8 10)
+;(3 7 5 0 0 (expand 0 8 10)
+;(3 7 5 0 0 0 (expand 0 8 10)
+
+
+'(exercise 3 59)
+(define (integrate-series s)
+  (stream-map / s integers))
+
+(define cosine-series
+  (cons-stream 1 (integrate-series (scale-stream sine-series -1))))
+
+(define sine-series
+  (cons-stream 0 (integrate-series cosine-series)))
+
+()
 
 
 
